@@ -1,4 +1,5 @@
 # Cat-Walk
 
 ## Integrante
-### Enyel Antonio Baltodano Villareyna
+### Baltodano Villareyna Enyel Antonio 
+### Saballos Garcia Mijail Alexander
