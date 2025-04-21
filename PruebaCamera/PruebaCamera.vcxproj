@@ -109,7 +109,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\EnyelB\Desktop\Repositorios\Cat-Walk\PruebaCamera\Include\FreeImage\Dist\x64;$(SolutionDir)\..\PruebaCamera\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)\..\PruebaCamera\Include\FreeImage\Dist\x64;$(SolutionDir)\..\PruebaCamera\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>FreeImage.lib;glfw3.lib;glew32.lib;opengl32.lib;user32.lib;gdi32.lib;shell32.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
