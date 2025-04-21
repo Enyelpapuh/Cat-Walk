@@ -1,0 +1,152 @@
+// Requiere: GLFW, GLAD, GLM
+// Para compilar: g++ main.cpp -lglfw -ldl -lGL -lX11 -lpthread -lXrandr -lXi -o physics_demo
+
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <iostream>
+
+// Vertex Shader
+const char* vertexShaderSource = R"glsl(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+void main() {
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+})glsl";
+
+// Fragment Shader
+const char* fragmentShaderSource = R"glsl(
+#version 330 core
+out vec4 FragColor;
+uniform vec3 color;
+void main() {
+    FragColor = vec4(color, 1.0);
+})glsl";
+
+unsigned int createShaderProgram() {
+    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
+    glCompileShader(vertexShader);
+
+    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
+    glCompileShader(fragmentShader);
+
+    unsigned int shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+    return shaderProgram;
+}
+
+float cubeVertices[] = {
+    -0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f, -0.5f, 0.5f,-0.5f, // Back face
+    -0.5f,-0.5f, 0.5f,  0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f  // Front face
+};
+unsigned int indices[] = {
+    0,1,2, 2,3,0,
+    4,5,6, 6,7,4,
+    0,1,5, 5,4,0,
+    2,3,7, 7,6,2,
+    0,3,7, 7,4,0,
+    1,2,6, 6,5,1
+};
+
+struct RigidBody {
+    glm::vec3 position;
+    glm::vec3 velocity;
+    float mass;
+    float size = 1.0f;
+
+    void update(float dt, const glm::vec3& gravity) {
+        velocity += gravity * dt;
+        position += velocity * dt;
+
+        float halfSize = size * 0.5f;
+        if (position.y - halfSize <= 0.0f) {
+            position.y = halfSize;
+            velocity.y *= -0.7f; // rebote con pérdida de energía
+        }
+    }
+};
+int cubofisica() {
+    glfwInit();
+    GLFWwindow* window = glfwCreateWindow(800, 600, "Physics Cubes", nullptr, nullptr);
+    glfwMakeContextCurrent(window);
+    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    glEnable(GL_DEPTH_TEST);
+
+    unsigned int VAO, VBO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // La función createShaderProgram no necesita argumentos en este caso, ya que las fuentes de los shaders
+       // están definidas como variables globales. Elimina los argumentos de la llamada.
+    unsigned int shaderProgram = createShaderProgram();
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.f / 600.f, 0.1f, 100.0f);
+    glm::mat4 view = glm::lookAt(glm::vec3(5, 5, 10), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+
+    glm::vec3 gravity(0, -9.81f, 0);
+    RigidBody cube1 = { glm::vec3(-1.0f, 5.0f, 0.0f), glm::vec3(0), 1.0f };
+    RigidBody cube2 = { glm::vec3(1.0f, 8.0f, 0.0f), glm::vec3(0), 1.0f };
+
+    float lastTime = glfwGetTime();
+
+    while (!glfwWindowShouldClose(window)) {
+        float currentTime = glfwGetTime();
+        float dt = currentTime - lastTime;
+        lastTime = currentTime;
+
+        cube1.update(dt, gravity);
+        cube2.update(dt, gravity);
+
+        glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glUseProgram(shaderProgram);
+
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+        glBindVertexArray(VAO);
+
+        glm::mat4 model1 = glm::translate(glm::mat4(1.0f), cube1.position);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model1));
+        glUniform3f(glGetUniformLocation(shaderProgram, "color"), 1.0f, 0.0f, 0.0f);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+        glm::mat4 model2 = glm::translate(glm::mat4(1.0f), cube2.position);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model2));
+        glUniform3f(glGetUniformLocation(shaderProgram, "color"), 0.0f, 0.5f, 1.0f);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+        glm::mat4 groundModel = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0, -0.01f, 0)), glm::vec3(20, 0.01f, 20));
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(groundModel));
+        glUniform3f(glGetUniformLocation(shaderProgram, "color"), 0.2f, 0.2f, 0.2f);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    glfwTerminate();
+    return 0;
+}
