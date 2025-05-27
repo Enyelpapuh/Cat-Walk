@@ -71,8 +71,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)\..\CatProyect\Libreries\Include;$(SolutionDir)\..\CatProyect\Headerfiles;C:\Users\EnyelB\Desktop\Repositorios\AU_Main\Cat-Walk\CatProyect\Libreries\Include\FreeImage\Dist\x64;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\EnyelB\Desktop\Repositorios\AU_Main\Cat-Walk\CatProyect\Libreries\lib;C:\Users\EnyelB\Desktop\Repositorios\AU_Main\Cat-Walk\CatProyect\Libreries\Include\FreeImage\Dist\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\..\CatProyect\Libreries\Include;$(SolutionDir)\..\CatProyect\Headerfiles;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\..\CatProyect\Libreries\lib;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
