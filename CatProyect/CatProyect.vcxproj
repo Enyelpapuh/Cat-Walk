@@ -712,14 +712,6 @@
     <None Include="Libreries\Include\glm\gtx\wrap.inl" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Cfiles\GuiManager.cpp" />
-    <ClCompile Include="Cfiles\imgui.cpp" />
-    <ClCompile Include="Cfiles\imgui_demo.cpp" />
-    <ClCompile Include="Cfiles\imgui_draw.cpp" />
-    <ClCompile Include="Cfiles\imgui_impl_glfw.cpp" />
-    <ClCompile Include="Cfiles\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="Cfiles\imgui_tables.cpp" />
-    <ClCompile Include="Cfiles\imgui_widgets.cpp" />
     <ClCompile Include="Cfiles\InitGL.cpp" />
     <ClCompile Include="Cfiles\Main.cpp" />
     <ClCompile Include="glad.c" />

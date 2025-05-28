@@ -40,6 +40,8 @@ GLFWwindow* initOpenGL()
     glEnable(GL_DEPTH_TEST);
 
 
+
     return window;
 }
+
 

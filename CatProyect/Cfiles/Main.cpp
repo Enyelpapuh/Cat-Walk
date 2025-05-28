@@ -32,11 +32,11 @@ extern unsigned int SCR_HEIGHT = 600;
 extern float lastX = SCR_WIDTH / 2.0f;
 extern float lastY = SCR_HEIGHT / 2.0f;
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow* window);
-
+//void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+//void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+//void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+//void processInput(GLFWwindow* window);
+void SetCatAnimation(Animation* newAnim);
 
 
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -46,11 +46,14 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-Animation* cyborgAnimation = nullptr;
-Animation* bananaAnimation = nullptr;
+Animation* catAnimation1 = nullptr;
+Animation* catAnimation2 = nullptr;
+Animation* catAnimation3 = nullptr;
+Animation* catAnimation4 = nullptr;
+Animation* catAnimation5 = nullptr;
 
-Animator cyborgAnimator(nullptr);
-Animator bananaAnimator(nullptr);
+Animator catAnimator1(nullptr);
+Animator catAnimator2(nullptr);
 
 //IMGUI
 bool runMain = false;
@@ -99,25 +102,33 @@ int main()
 
 
 	GLFWwindow* window = initOpenGL();
-
 	Shader ourShader("anim_model.vs", "anim_model.fs");
+
+
+	// Configuracion donde se carga el modelo y las animaciones a ocupar de ese modelo
+	Model catM1("Assets/Models/Bananin/bananin-danced.fbx", "Assets/Models/Bananin/textures/BananaColor.png");//modelo
+
+	catAnimation1 = new Animation("Assets/Models/Bananin/bananin-danced.fbx", &catM1, "default");//animacion
+	catAnimation2 = new Animation("Assets/Models/Bananin/bananin-Run.fbx", &catM1, "run");//animacion
+	catAnimation3 = new Animation("Assets/Models/Bananin/bananin-Run.fbx", &catM1, "default");//animacion
+	catAnimation4 = new Animation("Assets/Models/Bananin/bananin-Run.fbx", &catM1, "default");//animacion
+	catAnimation5 = new Animation("Assets/Models/Bananin/bananin-danced.fbx", &catM1, "default");//animacion
+
+
 	ourShader.use();
 	ourShader.setVec3("ambientLightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 	ourShader.setFloat("ambientStrength", 0.9f);
 
-	Model cyborgModel("Assets/Models/cueva/cueva.fbx", "Assets/Models/cueva/textures/caveColor.png");//modelo
-	Model bananaModel("Assets/Models/cat2/cat2.fbx", "Assets/Models/cat2/textures/cat2Color.png");//modelo
 
-	cyborgAnimation = new Animation("Assets/Models/cat1/cat1.fbx", &cyborgModel, "sdf|Armature|Armature|EmptyAction");//animacion
-	bananaAnimation = new Animation("Assets/Models/cat2/cat2.fbx", &bananaModel, "dfsdfsd");//animacion
+	// Carga del sonido
+	fmodSystem->createSound("Assets/Angeles.mp3", FMOD_DEFAULT, 0, &startSound); // Reemplaza con tu ruta real
+	// Este será el sonido en loop (ej: música de fondo)
+	fmodSystem->createSound("Assets/Angeles.mp3", FMOD_LOOP_NORMAL | FMOD_3D, 0, &loopSound);
 
-	if (cyborgAnimation->HasAnimation()) {
-		cyborgAnimator.AddAnimation(cyborgAnimation);
-		cyborgAnimator.PlayAnimation(cyborgAnimation);
-	}
-	if (bananaAnimation->HasAnimation()) {
-		bananaAnimator.AddAnimation(bananaAnimation);
-		bananaAnimator.PlayAnimation(bananaAnimation);
+
+	if (catAnimation1->HasAnimation()) {
+		catAnimator1.AddAnimation(catAnimation1);
+		catAnimator1.PlayAnimation(catAnimation1);
 	}
 
 	IMGUI_CHECKVERSION();
@@ -156,21 +167,6 @@ int main()
 		backgroundTexture = 0; // Asegura que el valor sea inválido
 	}
 
-	// Antes de usar la textura, verifica que sea válida
-	if (backgroundTexture == 0)
-	{
-		// Puedes mostrar un mensaje, usar una textura por defecto, o evitar dibujar la imagen
-		std::cerr << "Error: La textura de fondo no está inicializada correctamente." << std::endl;
-		// return o manejo alternativo según tu lógica
-	}
-
-
-
-
-	// Carga del sonido
-	fmodSystem->createSound("Assets/Angeles.mp3", FMOD_DEFAULT, 0, &startSound); // Reemplaza con tu ruta real
-	// Este será el sonido en loop (ej: música de fondo)
-	fmodSystem->createSound("Assets/Angeles.mp3", FMOD_LOOP_NORMAL | FMOD_3D, 0, &loopSound);
 
 
 	while (!glfwWindowShouldClose(window))
@@ -224,7 +220,7 @@ int main()
 			// Espacio para que el botón no se superponga con los bordes
 			ImGui::SetCursorPos(ImVec2(io.DisplaySize.x / 2 - 50, io.DisplaySize.y / 2 - 15));
 
-			if (ImGui::Button("Pruebadano", ImVec2(200, 50)))
+			if (ImGui::Button("comenzar", ImVec2(200, 50)))
 			{
 				fmodSystem->playSound(startSound, 0, false, 0);  // <--- Aquí se reproduce el sonido
 				fadeOutStart = true;
@@ -259,13 +255,15 @@ int main()
 		}
 		else
 		{
+			
 			processInput(window);
-
 			glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			cyborgAnimator.UpdateAnimation(deltaTime);
-			bananaAnimator.UpdateAnimation(deltaTime);
+			catAnimator1.UpdateAnimation(deltaTime);
+
+
+			float currentTime = glfwGetTime();
 
 			ourShader.use();
 
@@ -274,7 +272,7 @@ int main()
 			ourShader.setMat4("projection", projection);
 			ourShader.setMat4("view", view);
 
-			auto cyborgTransforms = cyborgAnimator.GetFinalBoneMatrices();
+			auto cyborgTransforms = catAnimator1.GetFinalBoneMatrices();
 			for (int i = 0; i < cyborgTransforms.size(); ++i)
 				ourShader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", cyborgTransforms[i]);
 
@@ -282,17 +280,8 @@ int main()
 			model1 = glm::translate(model1, glm::vec3(-1.0f, -1.0f, 0.0f));
 			model1 = glm::scale(model1, glm::vec3(0.01f));
 			ourShader.setMat4("model", model1);
-			cyborgModel.Draw(ourShader);
+			catM1.Draw(ourShader);
 
-			auto bananaTransforms = bananaAnimator.GetFinalBoneMatrices();
-			for (int i = 0; i < bananaTransforms.size(); ++i)
-				ourShader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", bananaTransforms[i]);
-
-			glm::mat4 model2 = glm::mat4(1.0f);
-			model2 = glm::translate(model2, glm::vec3(1.0f, -1.0f, 0.0f));
-			model2 = glm::scale(model2, glm::vec3(0.01f));
-			ourShader.setMat4("model", model2);
-			bananaModel.Draw(ourShader);
 
 			glm::vec3 camPos = camera.Position;
 			glm::vec3 camFront = camera.Front;
@@ -318,8 +307,8 @@ int main()
 		glfwPollEvents();
 	}
 
-	delete cyborgAnimation;
-	delete bananaAnimation;
+	delete catAnimation1;
+	delete catAnimation2;
 
 	startSound->release();
 	fmodSystem->close();
@@ -336,13 +325,46 @@ void processInput(GLFWwindow* window)
 		glfwSetWindowShouldClose(window, true);
 
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+	{
 		camera.ProcessKeyboard(FORWARD, deltaTime);
+		SetCatAnimation(catAnimation1);
+		std::cout << "cat Animation default" << std::endl;
+
+	}
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+	{
 		camera.ProcessKeyboard(BACKWARD, deltaTime);
+		SetCatAnimation(catAnimation3);
+		std::cout << "cat Animation s" << std::endl;
+	}
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+	{
 		camera.ProcessKeyboard(LEFT, deltaTime);
+		SetCatAnimation(catAnimation4);
+		std::cout << "cat Animation a" << std::endl;
+	}
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+	{
 		camera.ProcessKeyboard(RIGHT, deltaTime);
+		SetCatAnimation(catAnimation5);
+		std::cout << "cat Animation d" << std::endl;
+	}
+	//if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+	//{
+	//	camera.ProcessKeyboard(UP, deltaTime);
+	//}
+	//if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+	//{
+	//	camera.ProcessKeyboard(DOWN, deltaTime);
+	//}
+	if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
+		SetCatAnimation(catAnimation1);
+		std::cout << "Cyborg Animation Set" << std::endl;
+	}
+	if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+		SetCatAnimation(catAnimation2);
+		std::cout << "Banana Animation Set" << std::endl;
+	}
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -374,4 +396,9 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	camera.ProcessMouseScroll(yoffset);
+}
+void SetCatAnimation(Animation* newAnim) {
+	if (newAnim && newAnim->HasAnimation()) {
+		catAnimator1.PlayAnimation(newAnim);
+	}
 }
