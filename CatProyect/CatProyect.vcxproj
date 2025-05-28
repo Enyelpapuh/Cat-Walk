@@ -108,11 +108,12 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>fmod_vc.lib;fmodstudioL_vc.lib;fmodstudio_vc.lib;fmodL_vc.lib;FreeImage.lib;glfw3.lib;glew32.lib;opengl32.lib;user32.lib;gdi32.lib;shell32.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>sfml-graphics-d.lib;sfml-window-d.lib;sfml-audio-d.lib;sfml-network-d.lib;sfml-system-d.lib;fmod_vc.lib;fmodstudioL_vc.lib;fmodstudio_vc.lib;fmodL_vc.lib;FreeImage.lib;glfw3.lib;glew32.lib;opengl32.lib;user32.lib;gdi32.lib;shell32.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -123,12 +124,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>sfml-graphics-d.lib;sfml-window-d.lib;sfml-audio-d.lib;sfml-network-d.lib;sfml-system-d.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -156,6 +159,7 @@
     <ClInclude Include="Headerfiles\shaderProgram.h" />
     <ClInclude Include="Headerfiles\shader_m.h" />
     <ClInclude Include="Headerfiles\texture.h" />
+    <ClInclude Include="Headerfiles\UI.h" />
     <ClInclude Include="Libreries\Include\assimp\aabb.h" />
     <ClInclude Include="Libreries\Include\assimp\ai_assert.h" />
     <ClInclude Include="Libreries\Include\assimp\anim.h" />
@@ -714,6 +718,7 @@
   <ItemGroup>
     <ClCompile Include="Cfiles\InitGL.cpp" />
     <ClCompile Include="Cfiles\Main.cpp" />
+    <ClCompile Include="Cfiles\UI.cpp" />
     <ClCompile Include="glad.c" />
     <ClCompile Include="Libreries\Include\glm\detail\glm.cpp" />
     <ClCompile Include="Libreries\Include\glm\glm.cppm" />

@@ -1,11 +1,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include "Imgui/imgui.h"
-#include "Imgui/imgui_impl_glfw.h"
-#include "Imgui/imgui_impl_opengl3.h"
+#include <UI.h>
 
 #include <FMOD/fmod.hpp>
+#include <FMOD/fmod_errors.h> 
 #include <chrono>
 #include <thread>
 
@@ -55,12 +54,6 @@ Animation* catAnimation5 = nullptr;
 Animator catAnimator1(nullptr);
 Animator catAnimator2(nullptr);
 
-//IMGUI
-bool runMain = false;
-bool startScreen = true;
-bool fadeOutStart = false;
-float fadeOpacity = 1.0f;
-
 //FMOD
 //FMOD_RESULT result;
 
@@ -68,25 +61,6 @@ FMOD::System* fmodSystem;
 FMOD::Sound* startSound;
 FMOD::Sound* loopSound;       // <- Nuevo sonido que se repetirá
 FMOD::Channel* loopChannel;   // <- Canal para controlarlo (opcional)
-
-
-// Function to render ImGui
-void renderImGui()
-{
-	ImGui_ImplOpenGL3_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
-
-	ImGui::Begin("Controls");
-	if (ImGui::Button("Run Main"))
-	{
-		runMain = true;
-	}
-	ImGui::End();
-
-	ImGui::Render();
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-}
 
 //skyboxes data
 float skyboxVertices[] =
@@ -127,16 +101,46 @@ unsigned int skyboxIndices[] =
 
 int main()
 {
-	// Sonidos 
-	FMOD::System_Create(&fmodSystem);
-	fmodSystem->init(512, FMOD_INIT_NORMAL, 0);
 
-	// Cargar un sonido
-	fmodSystem->createSound("C:/Users/USUARIO/Downloads/FMOD/FMOD Studio API Windows/api/core/examples/media/swish.wav", FMOD_DEFAULT, 0, &startSound);
+	// Mostrar menú SFML
+	Menu menu;
+	menu.ejecutar();
 
-	// Este será el sonido en loop (ej: música de fondo)
-	fmodSystem->createSound("C:/Users/USUARIO/Downloads/FMOD/FMOD Studio API Windows/api/core/examples/media/singing.wav", FMOD_LOOP_NORMAL | FMOD_3D, 0, &loopSound);
+	// Si el usuario no presionó "Comenzar", salir
+	if (!menu.menuFinalizado()) {
+		return 0;
+	}
 
+	// Detener la música de SFML antes de iniciar FMOD
+	menu.detenerMusica();
+
+	// Inicialización de FMOD
+	FMOD_RESULT result;
+	result = FMOD::System_Create(&fmodSystem);
+	if (result != FMOD_OK) {
+		std::cerr << "FMOD error (System_Create): " << FMOD_ErrorString(result) << std::endl;
+		return 1;
+	}
+	result = fmodSystem->init(512, FMOD_INIT_NORMAL, 0);
+	if (result != FMOD_OK) {
+		std::cerr << "FMOD error (init): " << FMOD_ErrorString(result) << std::endl;
+		return 1;
+	}
+
+	result = fmodSystem->createSound("Assets/Music/Musica_Cueva.wav", FMOD_LOOP_NORMAL | FMOD_3D, 0, &loopSound);
+	if (result != FMOD_OK) {
+		std::cerr << "FMOD error (loopSound): " << FMOD_ErrorString(result) << std::endl;
+	}
+
+	// Reproducir la música de FMOD (por ejemplo, la de loop)
+	result = fmodSystem->playSound(loopSound, 0, false, &loopChannel);
+	if (result != FMOD_OK) {
+		std::cerr << "FMOD error (playSound): " << FMOD_ErrorString(result) << std::endl;
+	}
+	if (loopChannel) {
+		loopChannel->setPaused(false);
+		loopChannel->setVolume(1.0f);
+	}
 
 	GLFWwindow* window = initOpenGL();
 	Shader ourShader("Assets/Shaders/anim_model.vs", "Assets/Shaders/anim_model.fs");
@@ -231,24 +235,10 @@ int main()
 	ourShader.setVec3("ambientLightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 	ourShader.setFloat("ambientStrength", 0.9f);
 
-
-	// Carga del sonido
-	fmodSystem->createSound("Assets/Angeles.mp3", FMOD_DEFAULT, 0, &startSound); // Reemplaza con tu ruta real
-	// Este será el sonido en loop (ej: música de fondo)
-	fmodSystem->createSound("Assets/Angeles.mp3", FMOD_LOOP_NORMAL | FMOD_3D, 0, &loopSound);
-
-
 	if (catAnimation1->HasAnimation()) {
 		catAnimator1.AddAnimation(catAnimation1);
 		catAnimator1.PlayAnimation(catAnimation1);
 	}
-
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	ImGui::StyleColorsDark();
-	ImGui_ImplGlfw_InitForOpenGL(window, true);
-	ImGui_ImplOpenGL3_Init("#version 330");
 
 	GLuint backgroundTexture = 0; // Inicializa en 0 (valor inválido)
 	int imageWidth = 0, imageHeight = 0, nrChannels = 0;
@@ -287,151 +277,62 @@ int main()
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 
-		glfwSetInputMode(window, GLFW_CURSOR, startScreen ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+		processInput(window);
 
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
-		ImGui::NewFrame();
+		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		if (startScreen)
-		{
-			ImTextureID my_tex_id = (ImTextureID)(intptr_t)backgroundTexture;
+		// -------------------- ACTUALIZAR ANIMACIONES --------------------
+		catAnimator1.UpdateAnimation(deltaTime);
 
+		// -------------------- SKYBOX --------------------
+		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		glm::mat4 view = camera.GetViewMatrix();
 
-			ImGuiIO& io = ImGui::GetIO();
+		glDepthFunc(GL_LEQUAL);  // Permitir z igual
+		glDepthMask(GL_FALSE);   // Desactivar escritura de profundidad
 
-			ImGui::SetNextWindowPos(ImVec2(0, 0));
-			ImGui::SetNextWindowSize(io.DisplaySize);
+		ourShader2.use();
+		ourShader2.setMat4("view", glm::mat4(glm::mat3(view))); // sin traslación
+		ourShader2.setMat4("projection", projection);
 
-			ImGui::Begin("PantallaPrincipal", nullptr,
-				ImGuiWindowFlags_NoTitleBar |
-				ImGuiWindowFlags_NoResize |
-				ImGuiWindowFlags_NoMove |
-				ImGuiWindowFlags_NoScrollbar |
-				ImGuiWindowFlags_NoCollapse
-			);
+		glBindVertexArray(skyboxVAO);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+		glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+		glBindVertexArray(0);
 
-			// Imagen de fondo
-			ImGui::GetWindowDrawList()->AddImage(
-				(ImTextureID)(intptr_t)backgroundTexture,
-				ImGui::GetWindowPos(),
-				ImVec2(ImGui::GetWindowPos().x + io.DisplaySize.x,
-					ImGui::GetWindowPos().y + io.DisplaySize.y)
-			);
+		glDepthMask(GL_TRUE);    // Restaurar escritura
+		glDepthFunc(GL_LESS);    // Restaurar profundidad estándar
 
-			// Posicionar botón al centro
-			ImGui::SetCursorPos(ImVec2(io.DisplaySize.x / 2 - 50, io.DisplaySize.y / 2 - 15));
+		// -------------------- MODELO ANIMADO --------------------
+		ourShader.use();
+		ourShader.setMat4("projection", projection);
+		ourShader.setMat4("view", view);
 
-			// Estilo: botón oscuro con texto blanco
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));       // Fondo botón oscuro
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f)); // Al pasar el mouse
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));  // Al presionar
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));                      // Texto blanco
+		auto cyborgTransforms = catAnimator1.GetFinalBoneMatrices();
+		for (int i = 0; i < cyborgTransforms.size(); ++i)
+			ourShader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", cyborgTransforms[i]);
 
+		glm::mat4 model1 = glm::mat4(1.0f);
+		model1 = glm::translate(model1, glm::vec3(-1.0f, -1.0f, 0.0f));
+		model1 = glm::scale(model1, glm::vec3(0.01f));
+		ourShader.setMat4("model", model1);
+		catM1.Draw(ourShader);
 
-			// Espacio para que el botón no se superponga con los bordes
-			ImGui::SetCursorPos(ImVec2(io.DisplaySize.x / 2 - 50, io.DisplaySize.y / 2 - 15));
+		glm::vec3 camPos = camera.Position;
+		glm::vec3 camFront = camera.Front;
+		glm::vec3 camUp = camera.Up;
 
-			if (ImGui::Button("comenzar", ImVec2(200, 50)))
-			{
-				fmodSystem->playSound(startSound, 0, false, 0);  // <--- Aquí se reproduce el sonido
-				fadeOutStart = true;
+		FMOD_VECTOR listenerPos = { camPos.x, camPos.y, camPos.z };
+		FMOD_VECTOR listenerVel = { 0.0f, 0.0f, 0.0f };
+		FMOD_VECTOR forward = { camFront.x, camFront.y, camFront.z };
+		FMOD_VECTOR up = { camUp.x, camUp.y, camUp.z };
 
-				std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-
-				FMOD_VECTOR soundPos = { 0.0f, 0.0f, 0.0f };  // Posición donde se cargan los modelos
-				FMOD_VECTOR velocity = { 0.0f, 0.0f, 0.0f };  // Velocidad (puede ser 0 si está estático)
-
-				// Después de reproducir el sonido:
-				fmodSystem->playSound(loopSound, 0, false, &loopChannel);
-				loopChannel->set3DAttributes(&soundPos, &velocity);
-
-			}
-
-			// Restaurar estilos
-			ImGui::PopStyleColor(4);
-
-			ImGui::End();
-
-			if (fadeOutStart)
-			{
-				fadeOpacity -= deltaTime;
-				if (fadeOpacity <= 0.0f)
-				{
-					fadeOpacity = 0.0f;
-					startScreen = false;
-				}
-			}
-
-			ImGui::GetStyle().Alpha = fadeOpacity;
-		}
-		else
-		{
-			
-			processInput(window);
-
-			glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-			// -------------------- ACTUALIZAR ANIMACIONES --------------------
-			catAnimator1.UpdateAnimation(deltaTime);
-
-			// -------------------- SKYBOX --------------------
-			glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-			glm::mat4 view = camera.GetViewMatrix();
-
-			glDepthFunc(GL_LEQUAL);  // Permitir z igual
-			glDepthMask(GL_FALSE);   // Desactivar escritura de profundidad
-
-			ourShader2.use();
-			ourShader2.setMat4("view", glm::mat4(glm::mat3(view))); // sin traslación
-			ourShader2.setMat4("projection", projection);
-
-			glBindVertexArray(skyboxVAO);
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			glBindVertexArray(0);
-
-			glDepthMask(GL_TRUE);    // Restaurar escritura
-			glDepthFunc(GL_LESS);    // Restaurar profundidad estándar
-
-			// -------------------- MODELO ANIMADO --------------------
-			ourShader.use();
-			ourShader.setMat4("projection", projection);
-			ourShader.setMat4("view", view);
-
-			auto cyborgTransforms = catAnimator1.GetFinalBoneMatrices();
-			for (int i = 0; i < cyborgTransforms.size(); ++i)
-				ourShader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", cyborgTransforms[i]);
-
-			glm::mat4 model1 = glm::mat4(1.0f);
-			model1 = glm::translate(model1, glm::vec3(-1.0f, -1.0f, 0.0f));
-			model1 = glm::scale(model1, glm::vec3(0.01f));
-			ourShader.setMat4("model", model1);
-			catM1.Draw(ourShader);
-
-
-
-			glm::vec3 camPos = camera.Position;
-			glm::vec3 camFront = camera.Front;
-			glm::vec3 camUp = camera.Up;
-
-			FMOD_VECTOR listenerPos = { camPos.x, camPos.y, camPos.z };
-			FMOD_VECTOR listenerVel = { 0.0f, 0.0f, 0.0f };  // O calcula el movimiento si quieres efectos doppler
-			FMOD_VECTOR forward = { camFront.x, camFront.y, camFront.z };
-			FMOD_VECTOR up = { camUp.x, camUp.y, camUp.z };
-
-			fmodSystem->set3DListenerAttributes(0, &listenerPos, &listenerVel, &forward, &up);
-
-		}
-
-		ImGui::Render();
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		fmodSystem->set3DListenerAttributes(0, &listenerPos, &listenerVel, &forward, &up);
 
 		fmodSystem->update();
-
-		loopSound->set3DMinMaxDistance(1.0f, 10.0f);  // minDist, maxDist
+		if (loopSound) loopSound->set3DMinMaxDistance(1.0f, 10.0f);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -440,10 +341,12 @@ int main()
 	delete catAnimation1;
 	delete catAnimation2;
 
-	startSound->release();
-	fmodSystem->close();
-	fmodSystem->release();
-	loopSound->release();
+	if (startSound) startSound->release();
+	if (loopSound) loopSound->release();
+	if (fmodSystem) {
+		fmodSystem->close();
+		fmodSystem->release();
+	}
 
 	glfwTerminate();
 	return 0;
