@@ -66,13 +66,13 @@ FMOD::Channel* loopChannel;   // <- Canal para controlarlo (opcional)
 float skyboxVertices[] =
 {
 	//   Coordinates
-	-1.0f, -1.0f,  1.0f,//        7--------6
-	 1.0f, -1.0f,  1.0f,//       /|       /|
-	 1.0f, -1.0f, -1.0f,//      4--------5 |
-	-1.0f, -1.0f, -1.0f,//      | |      | |
-	-1.0f,  1.0f,  1.0f,//      | 3------|-2
-	 1.0f,  1.0f,  1.0f,//      |/       |/
-	 1.0f,  1.0f, -1.0f,//      0--------1
+	-1.0f, -1.0f,  1.0f,//       
+	 1.0f, -1.0f,  1.0f,//      
+	 1.0f, -1.0f, -1.0f,//      
+	-1.0f, -1.0f, -1.0f,//      
+	-1.0f,  1.0f,  1.0f,//      
+	 1.0f,  1.0f,  1.0f,//      
+	 1.0f,  1.0f, -1.0f,//      
 	-1.0f,  1.0f, -1.0f
 };
 
@@ -98,6 +98,9 @@ unsigned int skyboxIndices[] =
 	6, 2, 3
 };
 
+glm::vec3 modelPosition = glm::vec3(0.0f, 0.0f, 0.0f);
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+glm::mat4 view = modelPosition.GetViewMatrix();
 
 int main()
 {
@@ -286,8 +289,19 @@ int main()
 		catAnimator1.UpdateAnimation(deltaTime);
 
 		// -------------------- SKYBOX --------------------
-		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+
+		glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+
+		// NUEVO: hacer que la cámara siga al modelo
+		glm::vec3 cameraOffset(0.0f, 2.0f, 6.0f); // detrás y arriba del modelo
+		camera.FollowTarget(modelPosition.Position, cameraOffset);
+
+		// NUEVO: matriz de vista desde la cámara
 		glm::mat4 view = camera.GetViewMatrix();
+
+		ourShader2.setMat4("view", glm::mat4(glm::mat3(view))); // sin traslación
+
 
 		glDepthFunc(GL_LEQUAL);  // Permitir z igual
 		glDepthMask(GL_FALSE);   // Desactivar escritura de profundidad
@@ -314,11 +328,14 @@ int main()
 		for (int i = 0; i < cyborgTransforms.size(); ++i)
 			ourShader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", cyborgTransforms[i]);
 
+
+
 		glm::mat4 model1 = glm::mat4(1.0f);
 		model1 = glm::translate(model1, glm::vec3(-1.0f, -1.0f, 0.0f));
 		model1 = glm::scale(model1, glm::vec3(0.01f));
 		ourShader.setMat4("model", model1);
 		catM1.Draw(ourShader);
+
 
 		glm::vec3 camPos = camera.Position;
 		glm::vec3 camFront = camera.Front;
