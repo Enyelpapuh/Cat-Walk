@@ -83,7 +83,10 @@ public:
 	{
 		return m_FinalBoneMatrices;
 	}
-
+	 bool HasAnimation() const
+    {
+        return m_CurrentAnimation && m_CurrentAnimation->HasAnimation();
+    }
 
 private:
 	std::vector<glm::mat4> m_FinalBoneMatrices;

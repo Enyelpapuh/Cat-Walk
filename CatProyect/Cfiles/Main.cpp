@@ -1,4 +1,4 @@
-#include <glad/glad.h>
+ï»¿#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <UI.h>
@@ -38,7 +38,8 @@ extern float lastY = SCR_HEIGHT / 2.0f;
 void SetCatAnimation(Animation* newAnim);
 
 
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, .0f));
+ModelController modelController(glm::vec3(-1.0f, -1.0f, 0.0f));
 
 bool firstMouse = true;
 
@@ -59,20 +60,20 @@ Animator catAnimator2(nullptr);
 
 FMOD::System* fmodSystem;
 FMOD::Sound* startSound;
-FMOD::Sound* loopSound;       // <- Nuevo sonido que se repetirá
+FMOD::Sound* loopSound;       // <- Nuevo sonido que se repetirï¿½
 FMOD::Channel* loopChannel;   // <- Canal para controlarlo (opcional)
 
 //skyboxes data
 float skyboxVertices[] =
 {
 	//   Coordinates
-	-1.0f, -1.0f,  1.0f,//       
-	 1.0f, -1.0f,  1.0f,//      
-	 1.0f, -1.0f, -1.0f,//      
-	-1.0f, -1.0f, -1.0f,//      
-	-1.0f,  1.0f,  1.0f,//      
-	 1.0f,  1.0f,  1.0f,//      
-	 1.0f,  1.0f, -1.0f,//      
+	-1.0f, -1.0f,  1.0f,//        7--------6
+	 1.0f, -1.0f,  1.0f,//       /|       /|
+	 1.0f, -1.0f, -1.0f,//      4--------5 |
+	-1.0f, -1.0f, -1.0f,//      | |      | |
+	-1.0f,  1.0f,  1.0f,//      | 3------|-2
+	 1.0f,  1.0f,  1.0f,//      |/       |/
+	 1.0f,  1.0f, -1.0f,//      0--------1
 	-1.0f,  1.0f, -1.0f
 };
 
@@ -98,26 +99,23 @@ unsigned int skyboxIndices[] =
 	6, 2, 3
 };
 
-glm::vec3 modelPosition = glm::vec3(0.0f, 0.0f, 0.0f);
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
-glm::mat4 view = modelPosition.GetViewMatrix();
 
 int main()
 {
 
-	// Mostrar menú SFML
+	// Mostrar menï¿½ SFML
 	Menu menu;
 	menu.ejecutar();
 
-	// Si el usuario no presionó "Comenzar", salir
+	// Si el usuario no presionï¿½ "Comenzar", salir
 	if (!menu.menuFinalizado()) {
 		return 0;
 	}
 
-	// Detener la música de SFML antes de iniciar FMOD
+	// Detener la mï¿½sica de SFML antes de iniciar FMOD
 	menu.detenerMusica();
 
-	// Inicialización de FMOD
+	// Inicializaciï¿½n de FMOD
 	FMOD_RESULT result;
 	result = FMOD::System_Create(&fmodSystem);
 	if (result != FMOD_OK) {
@@ -135,7 +133,7 @@ int main()
 		std::cerr << "FMOD error (loopSound): " << FMOD_ErrorString(result) << std::endl;
 	}
 
-	// Reproducir la música de FMOD (por ejemplo, la de loop)
+	// Reproducir la mï¿½sica de FMOD (por ejemplo, la de loop)
 	result = fmodSystem->playSound(loopSound, 0, false, &loopChannel);
 	if (result != FMOD_OK) {
 		std::cerr << "FMOD error (playSound): " << FMOD_ErrorString(result) << std::endl;
@@ -147,12 +145,17 @@ int main()
 
 	GLFWwindow* window = initOpenGL();
 	Shader ourShader("Assets/Shaders/anim_model.vs", "Assets/Shaders/anim_model.fs");
+	
+	// Configuracion donde se carga el modelo y las animaciones a ocupar de ese modelo
+	Model catM1("Assets/Models/Bananin/bananin-danced.fbx", "Assets/Models/Bananin/textures/BananaColor.png");//modelo
+	Model Mapa("Assets/Models/cueva/cueva.fbx", "Assets/Models/cueva/textures/CaveColor.png");//modelo
+
+
+
 	Shader ourShader2("skybox.vert", "skybox.frag");
 	ourShader.use();
 	ourShader.setVec3("ambientLightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 	ourShader.setFloat("ambientStrength", 0.9f);
-	ourShader2.use();
-	ourShader2.setFloat("skyboxIntensity", 0.5f);
 
 
 	// Create VAO, VBO, and EBO for the skybox
@@ -195,13 +198,18 @@ int main()
 	//glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	// Cycles through all the textures and attaches them to the cubemap object
-	for (unsigned int i = 0; i < 6; i++)
+	for(unsigned int i = 0; i < 6; i++)
 	{
+		// Para la textura right.jpg (i == 0), activar el flip vertical
+		if (i == 0)
+			stbi_set_flip_vertically_on_load(true);
+		else
+			stbi_set_flip_vertically_on_load(false);
+
 		int width, height, nrChannels;
 		unsigned char* data = stbi_load(facesCubemap[i].c_str(), &width, &height, &nrChannels, 0);
 		if (data)
 		{
-			stbi_set_flip_vertically_on_load(false);
 			glTexImage2D
 			(
 				GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
@@ -224,8 +232,6 @@ int main()
 	}
 
 
-	// Configuracion donde se carga el modelo y las animaciones a ocupar de ese modelo
-	Model catM1("Assets/Models/Bananin/bananin-danced.fbx", "Assets/Models/Bananin/textures/BananaColor.png");//modelo
 
 	catAnimation1 = new Animation("Assets/Models/Bananin/bananin-danced.fbx", &catM1, "default");//animacion
 	catAnimation2 = new Animation("Assets/Models/Bananin/bananin-Run.fbx", &catM1, "run");//animacion
@@ -236,50 +242,58 @@ int main()
 
 	ourShader.use();
 	ourShader.setVec3("ambientLightColor", glm::vec3(1.0f, 1.0f, 1.0f));
-	ourShader.setFloat("ambientStrength", 0.9f);
+
 
 	if (catAnimation1->HasAnimation()) {
 		catAnimator1.AddAnimation(catAnimation1);
 		catAnimator1.PlayAnimation(catAnimation1);
 	}
 
-	GLuint backgroundTexture = 0; // Inicializa en 0 (valor inválido)
-	int imageWidth = 0, imageHeight = 0, nrChannels = 0;
-	unsigned char* imageData = stbi_load("Assets/Models/Bananin/textures/BananaColor.png", &imageWidth, &imageHeight, &nrChannels, 0);
+	////
+	glGenVertexArrays(1, &skyboxVAO);
+	glGenBuffers(1, &skyboxVBO);
+	glGenBuffers(1, &skyboxEBO);
 
-	if (imageData)
-	{
-		glGenTextures(1, &backgroundTexture);
-		glBindTexture(GL_TEXTURE_2D, backgroundTexture);
+	glBindVertexArray(skyboxVAO);
 
-		// Determina el formato adecuado según los canales
-		GLenum format = GL_RGB;
-		if (nrChannels == 1)
-			format = GL_RED;
-		else if (nrChannels == 3)//jpg rgb
-			format = GL_RGB;
-		else if (nrChannels == 4)//png rgba
-			format = GL_RGBA;
+	glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
 
-		glTexImage2D(GL_TEXTURE_2D, 0, format, imageWidth, imageHeight, 0, format, GL_UNSIGNED_BYTE, imageData);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		stbi_image_free(imageData);
-	}
-	else
-	{
-		std::cerr << "No se pudo cargar la imagen de fondo:" << std::endl;
-		backgroundTexture = 0; // Asegura que el valor sea inválido
-	}
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, skyboxEBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(skyboxIndices), skyboxIndices, GL_STATIC_DRAW);
 
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+	////
 
 
 	while (!glfwWindowShouldClose(window))
 	{
+
+
+
+		// -------------------- NO TOUCH --------------------
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
+		//--------------------- direccion modelo --------------------
+		// Calcula la rotaciÃ³n deseada: la direcciÃ³n contraria a la cÃ¡mara
+		float desiredYaw = camera.Yaw + 180.0f;
 
+		// Normaliza Ã¡ngulo
+		if (desiredYaw > 180.0f)
+			desiredYaw -= 360.0f;
+		else if (desiredYaw < -180.0f)
+			desiredYaw += 360.0f;
+
+		// Suaviza la rotaciÃ³n (evita giros bruscos)
+		float rotationSpeed = 5.0f; // Puedes ajustar la velocidad de rotaciÃ³n
+		modelController.Yaw = glm::mix(modelController.Yaw, desiredYaw, deltaTime * rotationSpeed);
+
+
+		//-------------------- PROCESAR ENTRADAS --------------------
 		processInput(window);
 
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -288,55 +302,70 @@ int main()
 		// -------------------- ACTUALIZAR ANIMACIONES --------------------
 		catAnimator1.UpdateAnimation(deltaTime);
 
+
+
+		// Actualizar posiciÃ³n de la cÃ¡mara para que siga al modelo
+		glm::vec3 offset = -modelController.Front * 5.0f + glm::vec3(0.0f, 3.0f, 0.0f);
+		camera.Position = modelController.Position + offset;
+		camera.Target = modelController.Position;
 		// -------------------- SKYBOX --------------------
-		glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-
-		glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-
-		// NUEVO: hacer que la cámara siga al modelo
-		glm::vec3 cameraOffset(0.0f, 2.0f, 6.0f); // detrás y arriba del modelo
-		camera.FollowTarget(modelPosition.Position, cameraOffset);
-
-		// NUEVO: matriz de vista desde la cámara
+		// El modelo estÃ¡ en (-1.0, -1.0, 0.0)
+		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		glm::mat4 view = camera.GetViewMatrix();
 
-		ourShader2.setMat4("view", glm::mat4(glm::mat3(view))); // sin traslación
-
-
-		glDepthFunc(GL_LEQUAL);  // Permitir z igual
-		glDepthMask(GL_FALSE);   // Desactivar escritura de profundidad
+		glDepthFunc(GL_LEQUAL);
+		glDepthMask(GL_FALSE);
 
 		ourShader2.use();
-		ourShader2.setMat4("view", glm::mat4(glm::mat3(view))); // sin traslación
+		ourShader2.setMat4("view", glm::mat4(glm::mat3(view))); // sin traslacion
 		ourShader2.setMat4("projection", projection);
 
 		glBindVertexArray(skyboxVAO);
-		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-		glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, sizeof(skyboxIndices) / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
 
-		glDepthMask(GL_TRUE);    // Restaurar escritura
-		glDepthFunc(GL_LESS);    // Restaurar profundidad estándar
+		glDepthMask(GL_TRUE);
+		glDepthFunc(GL_LESS);
+
 
 		// -------------------- MODELO ANIMADO --------------------
+
+
 		ourShader.use();
 		ourShader.setMat4("projection", projection);
 		ourShader.setMat4("view", view);
 
-		auto cyborgTransforms = catAnimator1.GetFinalBoneMatrices();
-		for (int i = 0; i < cyborgTransforms.size(); ++i)
-			ourShader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", cyborgTransforms[i]);
+		ourShader.setBool("isAnimated", true); // <<<< ACTIVAR animaciÃ³n
+		if (catAnimator1.HasAnimation())
+		{
+			auto boneMatrices = catAnimator1.GetFinalBoneMatrices();
+			for (int i = 0; i < boneMatrices.size(); ++i)
+				ourShader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", boneMatrices[i]);
+		}
 
-
-
+		//glm::mat4 model1 = modelController.GetModelMatrix();
+		//model1 = glm::scale(model1, glm::vec3(0.01f));
 		glm::mat4 model1 = glm::mat4(1.0f);
-		model1 = glm::translate(model1, glm::vec3(-1.0f, -1.0f, 0.0f));
+		model1 = glm::translate(model1, modelController.Position);
+		model1 = glm::rotate(model1, glm::radians(modelController.Yaw), glm::vec3(0.0f, 1.0f, 0.0f));
 		model1 = glm::scale(model1, glm::vec3(0.01f));
 		ourShader.setMat4("model", model1);
 		catM1.Draw(ourShader);
 
+		// -------------------- MAPA --------------------
+		ourShader.setBool("isAnimated", false); // <<<< DESACTIVAR animaciÃ³n
+		glm::mat4 model2 = glm::mat4(1.0f);
+		model2 = glm::translate(model2, glm::vec3(0.0f, -1.0f, 0.0f));
+		model2 = glm::scale(model2, glm::vec3(10.0f));
+		model2 = glm::rotate(model2, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+		ourShader.setMat4("model", model2);
 
+		Mapa.Draw(ourShader);
+		//----------------------------------------------------------------
+
+
+		// -------------------- FMOD --------------------
 		glm::vec3 camPos = camera.Position;
 		glm::vec3 camFront = camera.Front;
 		glm::vec3 camUp = camera.Up;
@@ -371,31 +400,36 @@ int main()
 
 void processInput(GLFWwindow* window)
 {
+
+	// --------- Movimiento del modelo ---------
+	// Hacer que el modelo apunte donde apunta la cÃ¡mara
+	modelController.SetYaw(camera.Yaw);
+
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 	{
-		camera.ProcessKeyboard(FORWARD, deltaTime);
+		modelController.ProcessKeyboard(BACKWARD, deltaTime);
 		SetCatAnimation(catAnimation1);
 		std::cout << "cat Animation default" << std::endl;
 
 	}
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 	{
-		camera.ProcessKeyboard(BACKWARD, deltaTime);
+		modelController.ProcessKeyboard(FORWARD, deltaTime);
 		SetCatAnimation(catAnimation3);
 		std::cout << "cat Animation s" << std::endl;
 	}
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 	{
-		camera.ProcessKeyboard(LEFT, deltaTime);
+		modelController.ProcessKeyboard(LEFT, deltaTime);
 		SetCatAnimation(catAnimation4);
 		std::cout << "cat Animation a" << std::endl;
 	}
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 	{
-		camera.ProcessKeyboard(RIGHT, deltaTime);
+		modelController.ProcessKeyboard(RIGHT, deltaTime);
 		SetCatAnimation(catAnimation5);
 		std::cout << "cat Animation d" << std::endl;
 	}

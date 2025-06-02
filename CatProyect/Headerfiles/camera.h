@@ -14,17 +14,14 @@ enum Camera_Movement {
     RIGHT
 };
 
-// Default camera values
 const float YAW = -90.0f;
 const float PITCH = 0.0f;
 const float SPEED = 2.5f;
 const float SENSITIVITY = 0.1f;
 const float ZOOM = 45.0f;
 
-// --------------------------------------------------
-// Camera Class
-// --------------------------------------------------
-class Camera {
+class Camera
+{
 public:
     glm::vec3 Position;
     glm::vec3 Front;
@@ -38,25 +35,37 @@ public:
     float MouseSensitivity;
     float Zoom;
 
-    Camera(glm::vec3 position = glm::vec3(0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
-        float yaw = YAW, float pitch = PITCH)
-        : Front(glm::vec3(0.0f, 0.0f, -1.0f)),
-        MovementSpeed(SPEED),
-        MouseSensitivity(SENSITIVITY),
-        Zoom(ZOOM)
+    glm::vec3 Target = glm::vec3(0.0f, 0.0f, 0.0f);
+    float Distance = 5.0f;
+
+    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH)
+        : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
     {
         Position = position;
         WorldUp = up;
         Yaw = yaw;
         Pitch = pitch;
-        updateCameraVectors();
+        updateCameraPosition();
     }
 
-    glm::mat4 GetViewMatrix() {
-        return glm::lookAt(Position, Position + Front, Up);
+    Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch)
+        : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
+    {
+        Position = glm::vec3(posX, posY, posZ);
+        WorldUp = glm::vec3(upX, upY, upZ);
+        Yaw = yaw;
+        Pitch = pitch;
+        updateCameraPosition();
     }
 
-    void ProcessKeyboard(Camera_Movement direction, float deltaTime) {
+    glm::mat4 GetViewMatrix()
+    {
+        updateCameraPosition();
+        return glm::lookAt(Position, Target, Up);
+    }
+
+    void ProcessKeyboard(Camera_Movement direction, float deltaTime)
+    {
         float velocity = MovementSpeed * deltaTime;
         if (direction == FORWARD)
             Position += Front * velocity;
@@ -68,7 +77,8 @@ public:
             Position += Right * velocity;
     }
 
-    void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true) {
+    void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true)
+    {
         xoffset *= MouseSensitivity;
         yoffset *= MouseSensitivity;
 
@@ -76,37 +86,33 @@ public:
         Pitch += yoffset;
 
         if (constrainPitch) {
-            if (Pitch > 89.0f)
-                Pitch = 89.0f;
-            if (Pitch < -89.0f)
-                Pitch = -89.0f;
+            if (Pitch > 89.0f) Pitch = 89.0f;
+            if (Pitch < -89.0f) Pitch = -89.0f;
         }
 
-        updateCameraVectors();
+        updateCameraPosition();
     }
 
-    void ProcessMouseScroll(float yoffset) {
-        Zoom -= yoffset;
-        if (Zoom < 1.0f)
-            Zoom = 1.0f;
-        if (Zoom > 45.0f)
-            Zoom = 45.0f;
-    }
-    void FollowTarget(const glm::vec3& targetPosition, const glm::vec3& offset)
+    void ProcessMouseScroll(float yoffset)
     {
-        Position = targetPosition + offset;
-        Front = glm::normalize(targetPosition - Position);
-        Right = glm::normalize(glm::cross(Front, WorldUp));
-        Up = glm::normalize(glm::cross(Right, Front));
+        Distance -= yoffset;
+        if (Distance < 2.0f) Distance = 2.0f;
+        if (Distance > 50.0f) Distance = 50.0f;
+
+        updateCameraPosition();
     }
 
 private:
-    void updateCameraVectors() {
-        glm::vec3 front;
-        front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-        front.y = sin(glm::radians(Pitch));
-        front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-        Front = glm::normalize(front);
+    void updateCameraPosition()
+    {
+        float yawRad = glm::radians(Yaw);
+        float pitchRad = glm::radians(Pitch);
+
+        Position.x = Target.x + Distance * cos(pitchRad) * cos(yawRad);
+        Position.y = Target.y + Distance * sin(pitchRad);
+        Position.z = Target.z + Distance * cos(pitchRad) * sin(yawRad);
+
+        Front = glm::normalize(Target - Position);
         Right = glm::normalize(glm::cross(Front, WorldUp));
         Up = glm::normalize(glm::cross(Right, Front));
     }
@@ -115,7 +121,7 @@ private:
 // --------------------------------------------------
 // ModelController Class
 // --------------------------------------------------
-const float MODEL_SPEED = 2.5f;
+const float MODEL_SPEED = 7.0f;
 
 class ModelController {
 public:
