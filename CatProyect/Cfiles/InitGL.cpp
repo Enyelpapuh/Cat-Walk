@@ -6,7 +6,7 @@
 #include <stb_image.h>
 
 
-GLFWwindow* initOpenGL()
+GLFWwindow* initOpenGL(bool fullscreen)
 {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -17,7 +17,9 @@ GLFWwindow* initOpenGL()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "CatWalk", NULL, NULL);
+    GLFWmonitor* monitor = fullscreen ? glfwGetPrimaryMonitor() : NULL;
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "CatWalk", monitor, NULL);   
+    
     if (!window)
     {
         std::cerr << "Failed to create GLFW window\n";

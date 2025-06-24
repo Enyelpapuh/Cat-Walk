@@ -7,6 +7,8 @@
 #include <FMOD/fmod_errors.h> 
 #include <chrono>
 #include <thread>
+#include <atomic>
+#include <SFML/Graphics.hpp>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -25,8 +27,8 @@
 
 #include "InitGL.h"
 
-extern unsigned int SCR_WIDTH = 800;
-extern unsigned int SCR_HEIGHT = 600;
+extern unsigned int SCR_WIDTH = 1920;
+extern unsigned int SCR_HEIGHT = 1080;
 
 extern float lastX = SCR_WIDTH / 2.0f;
 extern float lastY = SCR_HEIGHT / 2.0f;
@@ -37,6 +39,10 @@ extern float lastY = SCR_HEIGHT / 2.0f;
 //void processInput(GLFWwindow* window);
 void SetCatAnimation(Animation* newAnim);
 
+// Esta función lanza el menú de pausa en un hilo aparte
+
+std::atomic<bool> pausaActiva(false);
+std::atomic<bool> juegoPausado(false);
 
 Camera camera(glm::vec3(0.0f, 0.0f, .0f));
 ModelController modelController(glm::vec3(-1.0f, -1.0f, 0.0f));
@@ -62,6 +68,30 @@ FMOD::System* fmodSystem;
 FMOD::Sound* startSound;
 FMOD::Sound* loopSound;       // <- Nuevo sonido que se repetir�
 FMOD::Channel* loopChannel;   // <- Canal para controlarlo (opcional)
+
+void lanzarMenuPausa(Menu* menu) {
+	pausaActiva = true;
+	juegoPausado = true; // Pausa el juego
+
+	// Pausar la música de FMOD si está sonando
+	if (loopChannel) {
+		loopChannel->setPaused(true);
+	}
+
+	bool continuar = menu->ejecutarPausa();
+
+	// Reanudar la música de FMOD si corresponde
+	if (loopChannel) {
+		loopChannel->setPaused(false);
+	}
+
+	pausaActiva = false;
+	juegoPausado = false; // Reanuda el juego
+
+	if (!continuar) {
+		std::exit(0); // Cierra todo el programa si se presionó "Salir"
+	}
+}
 
 //skyboxes data
 float skyboxVertices[] =
@@ -143,7 +173,14 @@ int main()
 		loopChannel->setVolume(1.0f);
 	}
 
-	GLFWwindow* window = initOpenGL();
+	GLFWwindow* window = nullptr;
+	if (menu.esPantallaCompleta()) {
+		window = initOpenGL(true); // true = fullscreen
+	}
+	else {
+		window = initOpenGL(false); // false = ventana normal
+	}
+
 	Shader ourShader("Assets/Shaders/anim_model.vs", "Assets/Shaders/anim_model.fs");
 	
 	// Configuracion donde se carga el modelo y las animaciones a ocupar de ese modelo
@@ -268,6 +305,7 @@ int main()
 	glBindVertexArray(0);
 	////
 
+	bool puedePausar = true;
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -278,7 +316,28 @@ int main()
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
+
+		// --- PAUSE MENU LOGIC BEGIN HERE ---
+		static bool puedePausar = true;
+		if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && puedePausar && !pausaActiva) {
+			puedePausar = false;
+			std::thread pausaThread(lanzarMenuPausa, &menu);
+			pausaThread.detach();
+		}
+		if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE) {
+			puedePausar = true;
+		}
+
+		// --- PAUSE GAME LOOP ---
+		if (juegoPausado) {
+			// Opcional: puedes poner aquí lógica para mostrar un overlay de "Pausado" si quieres
+			glfwPollEvents(); // Permite cerrar la ventana principal con la X
+			continue; // Salta el resto del bucle hasta que se reanude
+		}
+
+		// --- PAUSE MENU LOGIC FINISH HERE ---
 		//--------------------- direccion modelo --------------------
+	
 		// Calcula la rotación deseada: la dirección contraria a la cámara
 		float desiredYaw = camera.Yaw + 180.0f;
 
@@ -481,8 +540,13 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	camera.ProcessMouseScroll(yoffset);
 }
-void SetCatAnimation(Animation* newAnim) {
-	if (newAnim && newAnim->HasAnimation()) {
+Animation* currentCatAnimation = nullptr;
+
+void SetCatAnimation(Animation* newAnim)
+{
+	if (newAnim && newAnim->HasAnimation() && newAnim != currentCatAnimation)
+	{
 		catAnimator1.PlayAnimation(newAnim);
+		currentCatAnimation = newAnim;
 	}
 }

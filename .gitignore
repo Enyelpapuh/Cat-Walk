@@ -1,9 +1,4 @@
 
-
-#no libreries
-Include/
-lib/
-
 # User-specific files
 *.rsuser
 *.suo

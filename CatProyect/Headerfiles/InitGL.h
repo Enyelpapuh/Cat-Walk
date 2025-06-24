@@ -14,7 +14,7 @@ extern float lastX ;
 extern float lastY ;
 
 
-GLFWwindow* initOpenGL();
+GLFWwindow* initOpenGL(bool fullscreen);
 void processInput(GLFWwindow* window);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);

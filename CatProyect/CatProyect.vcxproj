@@ -71,7 +71,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)\..\CatProyect\Libreries\Include;$(SolutionDir)\..\CatProyect\Headerfiles;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\..\CatProyect\Libreries\Include;$(SolutionDir)\..\CatProyect\Headerfiles;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;C:\Users\Rebec\Downloads\catwalko\wiskas2.0\CatProyect\Libreries\Include\SFML;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\..\CatProyect\Libreries\lib;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
