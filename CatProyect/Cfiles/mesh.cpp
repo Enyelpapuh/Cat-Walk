@@ -44,6 +44,8 @@ Mesh::Mesh(std::string filePath)
 	Assimp::Importer importer;
 	const aiScene* scene = NULL;
 	unsigned int n = 0, t;
+	glm::vec3 aabbMin(FLT_MAX);
+	glm::vec3 aabbMax(-FLT_MAX);
 
 	// Load the file into a "scene"
 	for (int k = 0; k < 1; k++)
@@ -62,6 +64,10 @@ Mesh::Mesh(std::string filePath)
 		memcpy(&v.m_position, &mesh->mVertices[t], sizeof(glm::vec3));
 		memcpy(&v.m_normal, &mesh->mNormals[t], sizeof(glm::vec3));
 		memcpy(&v.m_texCoord, &mesh->mTextureCoords[0][t], sizeof(glm::vec2));
+
+		/* ---------- AQUI ---------- */
+		aabbMin = glm::min(aabbMin, v.m_position);
+		aabbMax = glm::max(aabbMax, v.m_position);
 
 		// add to vertex buffer
 		m_vertices.push_back(v);

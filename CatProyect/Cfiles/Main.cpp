@@ -26,6 +26,8 @@
 #include <iostream>
 
 #include "InitGL.h"
+// Bullet
+#include "PhysicsManager.h"
 
 extern unsigned int SCR_WIDTH = 1920;
 extern unsigned int SCR_HEIGHT = 1080;
@@ -37,7 +39,6 @@ extern float lastY = SCR_HEIGHT / 2.0f;
 //void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 //void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 //void processInput(GLFWwindow* window);
-void SetCatAnimation(Animation* newAnim);
 
 // Esta función lanza el menú de pausa en un hilo aparte
 
@@ -48,6 +49,8 @@ Camera camera(glm::vec3(0.0f, 0.0f, .0f));
 ModelController modelController(glm::vec3(-1.0f, -1.0f, 0.0f));
 
 bool firstMouse = true;
+bool isMovingForward = false;
+bool saltoIniciado = false;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -58,8 +61,18 @@ Animation* catAnimation3 = nullptr;
 Animation* catAnimation4 = nullptr;
 Animation* catAnimation5 = nullptr;
 
+// -------------------- Estado de animación --------------------
+enum class AnimState { Idle, WalkFwd, WalkBack, StrafeL, StrafeR };
+
+void SetCatAnimation(Animation* newClip, AnimState newState);
+
+AnimState gCurrentState = AnimState::Idle;   // lo que YA se reproduce
+Animation* gCurrentClip = nullptr;
+
 Animator catAnimator1(nullptr);
-Animator catAnimator2(nullptr);
+//Physics init
+PhysicsManager physics;
+btRigidBody* catRigidBody = physics.CreateDynamicBox(glm::vec3(0, 5.0, 0), glm::vec3(0.5f, 1.0f, 0.5f), 1.0f);
 
 //FMOD
 //FMOD_RESULT result;
@@ -132,7 +145,7 @@ unsigned int skyboxIndices[] =
 
 int main()
 {
-
+	bool enElSuelo = false; // Local, no global
 	// Mostrar men� SFML
 	Menu menu;
 	menu.ejecutar();
@@ -181,18 +194,103 @@ int main()
 		window = initOpenGL(false); // false = ventana normal
 	}
 
-	Shader ourShader("Assets/Shaders/anim_model.vs", "Assets/Shaders/anim_model.fs");
-	
-	// Configuracion donde se carga el modelo y las animaciones a ocupar de ese modelo
-	Model catM1("Assets/Models/Bananin/bananin-danced.fbx", "Assets/Models/Bananin/textures/BananaColor.png");//modelo
-	Model Mapa("Assets/Models/cueva/cueva.fbx", "Assets/Models/cueva/textures/CaveColor.png");//modelo
+	//-------------crear el cubo de la hitbox----------------------------
+	GLuint cubeVAO, cubeVBO;
+	float cubeVertices[] = {
+		// 8 vértices del cubo
+		-0.5f, -0.5f, -0.5f,
+		 0.5f, -0.5f, -0.5f,
+		 0.5f,  0.5f, -0.5f,
+		-0.5f,  0.5f, -0.5f,
+		-0.5f, -0.5f,  0.5f,
+		 0.5f, -0.5f,  0.5f,
+		 0.5f,  0.5f,  0.5f,
+		-0.5f,  0.5f,  0.5f
+	};
 
+	unsigned int cubeIndices[] = {
+		0, 1, 1, 2, 2, 3, 3, 0, // atrás
+		4, 5, 5, 6, 6, 7, 7, 4, // adelante
+		0, 4, 1, 5, 2, 6, 3, 7  // conexiones entre cara frontal y trasera
+	};
+
+	GLuint cubeEBO;
+	glGenVertexArrays(1, &cubeVAO);
+	glGenBuffers(1, &cubeVBO);
+	glGenBuffers(1, &cubeEBO);
+
+	glBindVertexArray(cubeVAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+	glBindVertexArray(0);
+	//-------------------------------------------------------------------
+
+
+	// Después de inicializar OpenGL y antes del loop principal:
+	GLuint dbgVAO = 0, dbgVBO = 0;
+	glGenVertexArrays(1, &dbgVAO);
+	glGenBuffers(1, &dbgVBO);
+	Shader ourShader("Assets/Shaders/anim_model.vs", "Assets/Shaders/anim_model.fs");
+	Shader lineShader("Assets/Shaders/debug_line.vs", "Assets/Shaders/debug_line.fs");
+
+	// Configuracion donde se carga el modelo y las animaciones a ocupar de ese modelo
+	Model catM1("Assets/Models/GATO/Gato_Default.fbx", "Assets/Models/GATO/textures/CatColor.png");//modelo
+	Model faroModel("Assets/Models/Faro/Faro.fbx", "Assets/Models/Faro/textures/FaroColor.png");
+	glm::vec3 faroPosition = glm::vec3(10.0f, 0.0f, 5.0f); // Cambia la posición según lo necesites
+
+
+
+
+	Model Mapa("Assets/Models/cueva/city2.fbx", "Assets/Models/cueva/textures/ParkColor1.png");//modelo
+	// Sincronizar la dirección inicial del modelo con la cámara
+	modelController.Yaw = camera.Yaw;
+	modelController.updateVectors();
+	// Crear colisionador dinámico para el gato
+	btRigidBody* catRigidBody = physics.CreateDynamicBox(
+		glm::vec3(0, 5.0f, 0),      // posición inicial
+		glm::vec3(0.5f, 0.5f, 1.0f), // tamaño caja (ancho, alto, profundidad)
+		1.0f                      // masa
+	);
+
+	// Configurar el shader del gato
+	lineShader.use();
+	// Define the projection matrix before using it
+	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+	glm::mat4 view = camera.GetViewMatrix();
+
+	// Use the projection matrix in the shaderdddd
+	lineShader.setMat4("projection", projection);
+	lineShader.setMat4("view", view);
+	// Crear colisionador estático del mapa
+// Escala NO uniforme (correcto si quieres 20x4x20)
+	btRigidBody* mapRigidBody = physics.CreateStaticMeshFromModel(
+		Mapa,
+		glm::vec3(4.0f, 4.0f, 4.0f), // Escala X, Y, Z
+		glm::vec3(-90.0f, 0.0f, 0.0f)  // Rotación en grados
+	);
 
 
 	Shader ourShader2("skybox.vert", "skybox.frag");
+
 	ourShader.use();
-	ourShader.setVec3("ambientLightColor", glm::vec3(1.0f, 1.0f, 1.0f));
-	ourShader.setFloat("ambientStrength", 0.9f);
+	ourShader.setVec3("ambientLightColor", glm::vec3(0.2f, 0.2f, 0.3f)); // Azul tenue
+	ourShader.setFloat("ambientStrength", 1.0f);
+	// Configura la luz puntual del faro
+	glm::vec3 faroPos = glm::vec3(10.0f, 3.0f, 5.0f); // Ejemplo: posición del faro
+	ourShader.setVec3("pointLightPos", faroPos);
+	ourShader.setVec3("pointLightColor", glm::vec3(1.0f, 0.95f, 0.8f)); // Luz cálida
+	ourShader.setFloat("pointLightIntensity", 3.0f); // Más fuerte para compensar la noche
+	ourShader.setFloat("pointLightRadius", 20.0f);   // Ajusta el área iluminada
+	ourShader.setVec3("viewPos", camera.Position);
+
 
 
 	// Create VAO, VBO, and EBO for the skybox
@@ -269,16 +367,13 @@ int main()
 	}
 
 
+	catAnimation1 = new Animation("Assets/Models/GATO/Gato_Default2.fbx", &catM1, "default");//animacion
+	catAnimation2 = new Animation("Assets/Models/GATO/Gato_Walk.fbx", &catM1, "run");//animacion
+	catAnimation3 = new Animation("Assets/Models/GATO/Gato.fbx", &catM1, "running");//animacion
+	catAnimation4 = new Animation("Assets/Models/GATO/Gato_Default.fbx", &catM1, "default");//animacion
+	catAnimation5 = new Animation("Assets/Models/GATO/Gato_Default.fbx", &catM1, "default");//animacion
 
-	catAnimation1 = new Animation("Assets/Models/Bananin/bananin-danced.fbx", &catM1, "default");//animacion
-	catAnimation2 = new Animation("Assets/Models/Bananin/bananin-Run.fbx", &catM1, "run");//animacion
-	catAnimation3 = new Animation("Assets/Models/Bananin/bananin-Run.fbx", &catM1, "default");//animacion
-	catAnimation4 = new Animation("Assets/Models/Bananin/bananin-Run.fbx", &catM1, "default");//animacion
-	catAnimation5 = new Animation("Assets/Models/Bananin/bananin-danced.fbx", &catM1, "default");//animacion
 
-
-	ourShader.use();
-	ourShader.setVec3("ambientLightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
 
 	if (catAnimation1->HasAnimation()) {
@@ -312,10 +407,103 @@ int main()
 
 
 
-		// -------------------- NO TOUCH --------------------
+		// -------------------- TIEMPO --------------------
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
+		//-------------------- PROCESAR ENTRADAS --------------------
+		processInput(window, catRigidBody, deltaTime, enElSuelo);
+
+		// -------------------- FÍSICA --------------------
+		physics.StepSimulation(deltaTime);
+		physics.DebugDrawWorld(); // <── NUEVO: dibujar el mundo de Bullet
+
+		//---------Obtener posición actual del cuerpo del gato (controlado por física)
+		btTransform transform;
+		catRigidBody->getMotionState()->getWorldTransform(transform);
+		btVector3 pos = transform.getOrigin();
+		modelController.Position = glm::vec3(pos.x(), pos.y(), pos.z());
+
+		// Raycast desde la base del collider hacia abajo
+		glm::vec3 groundNormal(0.0f, 0.5f, 0.0f); // Normal por defecto
+		float halfHeight = 0.3f; // O el valor real de la mitad de tu collider
+		btVector3 from = pos - btVector3(0, halfHeight, 0);
+		btVector3 to = from - btVector3(0, 0.5f, 0);
+		btCollisionWorld::ClosestRayResultCallback rayCallback(from, to);
+		physics.GetDynamicsWorld()->rayTest(from, to, rayCallback);
+
+		bool estabaEnElSuelo = enElSuelo; // Guarda el estado anterior
+
+		enElSuelo = false;
+		if (rayCallback.hasHit()) {
+			float d = from.getY() - rayCallback.m_hitPointWorld.getY();
+			// Puedes ajustar el umbral según el tamaño del collider
+			if (d >= -0.5f && d < 0.5f) { // umbral típico para contacto
+				enElSuelo = true;
+				groundNormal = glm::vec3(rayCallback.m_hitNormalWorld.x(), rayCallback.m_hitNormalWorld.y(), rayCallback.m_hitNormalWorld.z());
+				std::cout << "Distancia base al suelo: " << d << " | Normal Y: " << rayCallback.m_hitNormalWorld.y() << std::endl;
+			}
+		}
+
+
+
+		// Imprime solo si hay cambio de estado
+		if (enElSuelo && !estabaEnElSuelo) {
+			std::cout << "¡Tocó el suelo!" << std::endl;
+		}
+		if (!enElSuelo && estabaEnElSuelo) {
+			std::cout << "¡En el aire!" << std::endl;
+		}
+
+		if (rayCallback.hasHit()) {
+			btVector3 n = rayCallback.m_hitNormalWorld;
+			groundNormal = glm::vec3(n.x(), n.y(), n.z());
+			enElSuelo = true; // Si el raycast golpea algo, asumimos que está en el suelo
+		}
+
+
+		// 3. Usa groundNormal para la inclinación del modelo (tu bloque original)
+		glm::vec3 up = glm::normalize(groundNormal);
+		glm::vec3 baseFront = glm::vec3(0.0f, 0.0f, 1.0f);
+		glm::mat4 yawMat = glm::rotate(glm::mat4(1.0f), glm::radians(modelController.Yaw - 90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		glm::vec3 front = glm::normalize(glm::vec3(yawMat * glm::vec4(baseFront, 0.0f)));
+		glm::vec3 right = glm::normalize(glm::cross(up, front));
+		front = glm::normalize(glm::cross(right, up));
+		glm::mat4 rotMat = glm::mat4(1.0f);
+		rotMat[0] = glm::vec4(right, 0.0f);
+		rotMat[1] = glm::vec4(up, 0.0f);
+		rotMat[2] = glm::vec4(-front, 0.0f);
+		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		//--------------------bullets physics-------------------
+		static float modelPitch = 0.0f;
+		float targetPitch = 0.0f;
+		float velY = catRigidBody->getLinearVelocity().y();
+
+		if (!enElSuelo) {
+			if (velY > 0.1f) {
+				// Está subiendo (salto)
+				targetPitch = 25.0f; // Ajusta el ángulo a tu gusto
+			}
+			else if (velY < -0.1f) {
+				// Está cayendo
+				targetPitch = -45.0f;
+			}
+			else {
+				// En el aire pero casi sin velocidad vertical
+				targetPitch = 0.0f;
+			}
+		}
+		else {
+			// En el suelo
+			targetPitch = 0.0f;
+			saltoIniciado = false;
+		}
+
+		float interpSpeed = 5.0f;
+		modelPitch += (targetPitch - modelPitch) * deltaTime * interpSpeed;
+
 
 		// --- PAUSE MENU LOGIC BEGIN HERE ---
 		static bool puedePausar = true;
@@ -352,19 +540,13 @@ int main()
 		modelController.Yaw = glm::mix(modelController.Yaw, desiredYaw, deltaTime * rotationSpeed);
 
 
-		//-------------------- PROCESAR ENTRADAS --------------------
-		processInput(window);
-
-		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 		// -------------------- ACTUALIZAR ANIMACIONES --------------------
 		catAnimator1.UpdateAnimation(deltaTime);
 
 
 
 		// Actualizar posición de la cámara para que siga al modelo
-		glm::vec3 offset = -modelController.Front * 5.0f + glm::vec3(0.0f, 3.0f, 0.0f);
+		glm::vec3 offset = -modelController.Front * 5.0f + glm::vec3(0.0f, 10.0f, 0.0f);
 		camera.Position = modelController.Position + offset;
 		camera.Target = modelController.Position;
 		// -------------------- SKYBOX --------------------
@@ -378,6 +560,7 @@ int main()
 		ourShader2.use();
 		ourShader2.setMat4("view", glm::mat4(glm::mat3(view))); // sin traslacion
 		ourShader2.setMat4("projection", projection);
+		ourShader2.setFloat("nightFactor", 1.0f);
 
 		glBindVertexArray(skyboxVAO);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
@@ -388,56 +571,180 @@ int main()
 		glDepthFunc(GL_LESS);
 
 
+
 		// -------------------- MODELO ANIMADO --------------------
+		//// --- Dibuja el rayo del raycast (láser) ---
+		//glm::vec3 rayStart(from.x(), from.y(), from.z());
+		//glm::vec3 rayEnd(to.x(), to.y(), to.z());
+		//glm::vec3 rayVertices[2] = { rayStart, rayEnd };
+
+		//GLuint rayVBO, rayVAO;
+		//glGenVertexArrays(1, &rayVAO);
+		//glGenBuffers(1, &rayVBO);
+
+		//glBindVertexArray(rayVAO);
+		//glBindBuffer(GL_ARRAY_BUFFER, rayVBO);
+		//glBufferData(GL_ARRAY_BUFFER, sizeof(rayVertices), rayVertices, GL_DYNAMIC_DRAW);
+		//glEnableVertexAttribArray(0);
+		//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+		//glm::vec3 color = enElSuelo ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0); // Verde si toca suelo, rojo si no
+		//lineShader.use();
+		//lineShader.setMat4("projection", projection);
+		//lineShader.setMat4("view", view);
+		//lineShader.setMat4("model", glm::mat4(1.0f));
+		//lineShader.setVec3("lineColor", color);
+
+		//glBindVertexArray(rayVAO);
+		//glDrawArrays(GL_LINES, 0, 2);
+		//glBindVertexArray(0);
+
+		//// Limpieza
+		//glDeleteBuffers(1, &rayVBO);
+		//glDeleteVertexArrays(1, &rayVAO);
+
+		/* ───────── matriz WORLD que viene del rigid‑body ───────── */
+		btTransform t;
+		catRigidBody->getMotionState()->getWorldTransform(t);      // pos. actual del cuerpo
+
+		glm::mat4 world(1.0f);
+		world = glm::translate(world,
+			glm::vec3(t.getOrigin().getX(),
+				t.getOrigin().getY(),
+				t.getOrigin().getZ()));
+
+
+
+		/* ────────── 1) modelo animado (escala 0.01 del FBX) ────────── */
+		float offsetY = -0.4f;
+		glm::mat4 modelMat = glm::mat4(1.0f);
+		modelMat = glm::translate(modelMat, modelController.Position + glm::vec3(0.0f, offsetY, 0.0f));
+		modelMat *= rotMat;
+		modelMat = glm::rotate(modelMat, glm::radians(modelPitch), glm::vec3(0.0f, 0.0f, 1.0f)); // Aplica la inclinación
+		modelMat = glm::scale(modelMat, glm::vec3(0.01f));
+
+
+
 
 
 		ourShader.use();
 		ourShader.setMat4("projection", projection);
 		ourShader.setMat4("view", view);
+		ourShader.setMat4("model", modelMat);
+		ourShader.setBool("isAnimated", true);
 
-		ourShader.setBool("isAnimated", true); // <<<< ACTIVAR animación
 		if (catAnimator1.HasAnimation())
 		{
-			auto boneMatrices = catAnimator1.GetFinalBoneMatrices();
-			for (int i = 0; i < boneMatrices.size(); ++i)
-				ourShader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]", boneMatrices[i]);
+			auto boneMats = catAnimator1.GetFinalBoneMatrices();
+			for (int i = 0; i < boneMats.size(); ++i)
+				ourShader.setMat4("finalBonesMatrices[" + std::to_string(i) + "]",
+					boneMats[i]);
 		}
-
-		//glm::mat4 model1 = modelController.GetModelMatrix();
-		//model1 = glm::scale(model1, glm::vec3(0.01f));
-		glm::mat4 model1 = glm::mat4(1.0f);
-		model1 = glm::translate(model1, modelController.Position);
-		model1 = glm::rotate(model1, glm::radians(modelController.Yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-		model1 = glm::scale(model1, glm::vec3(0.01f));
-		ourShader.setMat4("model", model1);
 		catM1.Draw(ourShader);
 
+		///* ────────── 2) cubo hitbox (azul) ────────── */
+		//// Usa los mismos half extents que el collider de Bullet
+		//glm::vec3 halfExt(0.5f, 0.5f, 1.0f);
+		//// Aplica la rotación y el escalado al cubo
+		//glm::mat4 cubeMat = world
+		//	* glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.4f, 0.0f))
+		//	* rotMat
+		//	* glm::rotate(glm::mat4(1.0f), glm::radians(modelPitch), glm::vec3(0.0f, 0.0f, 1.0f))
+		//	* glm::scale(glm::mat4(1.0f), halfExt);
+		//// Configura el shader para las líneas de debug
+
+		//lineShader.use();
+		//lineShader.setMat4("projection", projection);
+		//lineShader.setMat4("view", view);
+		//lineShader.setMat4("model", cubeMat);
+		//lineShader.setVec3("lineColor", glm::vec3(0, 1, 0));
+
+		//glBindVertexArray(cubeVAO);
+		//glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);
+		//glBindVertexArray(0);
+
+		///* ────────── 3) líneas de debug del mundo Bullet (verde) ────────── */
+		//const auto& lines = physics.GetDebugDrawer()->lines;
+		//if (!lines.empty())
+		//{
+		//	glBindVertexArray(dbgVAO);
+		//	glBindBuffer(GL_ARRAY_BUFFER, dbgVBO);
+		//	glBufferData(GL_ARRAY_BUFFER,
+		//		lines.size() * sizeof(glm::vec3),
+		//		lines.data(), GL_DYNAMIC_DRAW);
+
+		//	lineShader.use();
+		//	lineShader.setMat4("projection", projection);
+		//	lineShader.setMat4("view", view);
+		//	lineShader.setMat4("model", glm::mat4(1.0f));
+
+
+		//	glDisable(GL_DEPTH_TEST);
+		//	glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(lines.size()));
+		//	glEnable(GL_DEPTH_TEST);
+
+		//	glBindVertexArray(0);
+		//	physics.GetDebugDrawer()->Clear();
+		//}
+		// -------------------- FARO --------------------
+
+		std::vector<glm::vec3> posicionesFaros = {
+			glm::vec3(-8.0f, -6.0f, -48.0f),
+			glm::vec3(7.0f, -6.0f, -48.0f),
+			glm::vec3(46.0f, -6.0f, -7.0f),
+			glm::vec3(46.0f, -5.0f, 8.0f)
+		};
+
+		ourShader.use();
+		ourShader.setInt("numPointLights", posicionesFaros.size());
+		for (size_t i = 0; i < posicionesFaros.size(); ++i) {
+			ourShader.setVec3("pointLights[" + std::to_string(i) + "].position", posicionesFaros[i]);
+			ourShader.setVec3("pointLights[" + std::to_string(i) + "].color", glm::vec3(1.0f, 0.95f, 0.8f)); // o azul si quieres
+			ourShader.setFloat("pointLights[" + std::to_string(i) + "].intensity", 4.0f);
+			ourShader.setFloat("pointLights[" + std::to_string(i) + "].radius", 30.0f);
+		}
+		ourShader.setVec3("viewPos", camera.Position);
+		for (const auto& pos : posicionesFaros) {
+			glm::mat4 faroModelMat = glm::mat4(1.0f);
+			faroModelMat = glm::translate(faroModelMat, pos);
+			faroModelMat = glm::scale(faroModelMat, glm::vec3(2.0f, 1.0f, 2.0f));
+			faroModelMat = glm::rotate(faroModelMat, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
+			ourShader.use();
+			ourShader.setMat4("model", faroModelMat);
+			ourShader.setBool("isAnimated", false);
+			faroModel.Draw(ourShader);
+		}
+
+
 		// -------------------- MAPA --------------------
+		ourShader.use();
 		ourShader.setBool("isAnimated", false); // <<<< DESACTIVAR animación
 		glm::mat4 model2 = glm::mat4(1.0f);
-		model2 = glm::translate(model2, glm::vec3(0.0f, -1.0f, 0.0f));
-		model2 = glm::scale(model2, glm::vec3(10.0f));
+		model2 = glm::translate(model2, glm::vec3(0.0f, 0.0f, 0.0f));
+		model2 = glm::scale(model2, glm::vec3(4.0f, 4.0f, 4.0f));
 		model2 = glm::rotate(model2, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
 		ourShader.setMat4("model", model2);
 
 		Mapa.Draw(ourShader);
 		//----------------------------------------------------------------
 
 
-		// -------------------- FMOD --------------------
-		glm::vec3 camPos = camera.Position;
-		glm::vec3 camFront = camera.Front;
-		glm::vec3 camUp = camera.Up;
+		//// -------------------- FMOD --------------------
+		//glm::vec3 camPos = camera.Position;
+		//glm::vec3 camFront = camera.Front;
+		//glm::vec3 camUp = camera.Up;
 
-		FMOD_VECTOR listenerPos = { camPos.x, camPos.y, camPos.z };
-		FMOD_VECTOR listenerVel = { 0.0f, 0.0f, 0.0f };
-		FMOD_VECTOR forward = { camFront.x, camFront.y, camFront.z };
-		FMOD_VECTOR up = { camUp.x, camUp.y, camUp.z };
+		//FMOD_VECTOR listenerPos = { camPos.x, camPos.y, camPos.z };
+		//FMOD_VECTOR listenerVel = { 0.0f, 0.0f, 0.0f };
+		//FMOD_VECTOR forward = { camFront.x, camFront.y, camFront.z };
+		//FMOD_VECTOR up = { camUp.x, camUp.y, camUp.z };
 
-		fmodSystem->set3DListenerAttributes(0, &listenerPos, &listenerVel, &forward, &up);
+		//fmodSystem->set3DListenerAttributes(0, &listenerPos, &listenerVel, &forward, &up);
 
-		fmodSystem->update();
-		if (loopSound) loopSound->set3DMinMaxDistance(1.0f, 10.0f);
+		//fmodSystem->update();
+		//if (loopSound) loopSound->set3DMinMaxDistance(1.0f, 10.0f);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -457,56 +764,87 @@ int main()
 	return 0;
 }
 
-void processInput(GLFWwindow* window)
+void processInput(GLFWwindow* window,
+	btRigidBody* body,
+	float deltaTime, bool& enElSuelo)
 {
+	bool isMoving = false;
+	bool isRunning = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
 
-	// --------- Movimiento del modelo ---------
-	// Hacer que el modelo apunte donde apunta la cámara
-	modelController.SetYaw(camera.Yaw);
+	glm::vec3 forward = glm::normalize(glm::vec3(camera.Front.x, 0.0f, camera.Front.z));
+	glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0, 1, 0)));
 
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+	glm::vec3 v(0.0f);
+
+	// Cambia la velocidad según si está corriendo o no
+	if (isRunning) {
+		modelController.MovementSpeed = 8.0f;
+	}
+	else {
+		modelController.MovementSpeed = 4.0f;
+	}
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
+	}
 
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-	{
-		modelController.ProcessKeyboard(BACKWARD, deltaTime);
-		SetCatAnimation(catAnimation1);
-		std::cout << "cat Animation default" << std::endl;
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && enElSuelo) {
+		body->setLinearVelocity(btVector3(
+			body->getLinearVelocity().x(),
+			7.0f,
+			body->getLinearVelocity().z()));
+		enElSuelo = false;
+		saltoIniciado = true;
+		std::cout << "Salto aplicado, velocidad Y: " << body->getLinearVelocity().y() << std::endl;
+	}
 
+	// Movimiento basado en teclas
+	Animation* moveAnim = isRunning ? catAnimation3 : catAnimation2; // run o walk
+
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+		v += forward;
+		SetCatAnimation(moveAnim, AnimState::WalkFwd);
+		isMoving = true;
 	}
-	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-	{
-		modelController.ProcessKeyboard(FORWARD, deltaTime);
-		SetCatAnimation(catAnimation3);
-		std::cout << "cat Animation s" << std::endl;
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+		v -= forward;
+		SetCatAnimation(moveAnim, AnimState::WalkBack);
+		isMoving = true;
 	}
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-	{
-		modelController.ProcessKeyboard(LEFT, deltaTime);
-		SetCatAnimation(catAnimation4);
-		std::cout << "cat Animation a" << std::endl;
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+		v -= right;
+		SetCatAnimation(moveAnim, AnimState::StrafeL);
+		isMoving = true;
 	}
-	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-	{
-		modelController.ProcessKeyboard(RIGHT, deltaTime);
-		SetCatAnimation(catAnimation5);
-		std::cout << "cat Animation d" << std::endl;
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+		v += right;
+		SetCatAnimation(moveAnim, AnimState::StrafeR);
+		isMoving = true;
 	}
-	//if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-	//{
-	//	camera.ProcessKeyboard(UP, deltaTime);
-	//}
-	//if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-	//{
-	//	camera.ProcessKeyboard(DOWN, deltaTime);
-	//}
-	if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
-		SetCatAnimation(catAnimation1);
-		std::cout << "Cyborg Animation Set" << std::endl;
+
+	if (!isMoving) {
+		SetCatAnimation(catAnimation1, AnimState::Idle);
+		isMovingForward = false;
 	}
-	if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
-		SetCatAnimation(catAnimation2);
-		std::cout << "Banana Animation Set" << std::endl;
+
+	if (glm::length(v) > 0.01f) {
+		v = glm::normalize(v) * modelController.MovementSpeed;
+		btVector3 cur = body->getLinearVelocity();
+		body->setLinearVelocity(btVector3(v.x, cur.getY(), v.z));
+
+		float newYaw = glm::degrees(atan2(v.x, v.z));
+		if (newYaw > 180.0f) newYaw -= 360.0f;
+		if (newYaw < -180.0f) newYaw += 360.0f;
+		if (modelController.Yaw > 180.0f) modelController.Yaw -= 360.0f;
+		if (modelController.Yaw < -180.0f) modelController.Yaw += 360.0f;
+		float deltaYaw = newYaw - modelController.Yaw;
+		if (deltaYaw > 180.0f) deltaYaw -= 360.0f;
+		if (deltaYaw < -180.0f) deltaYaw += 360.0f;
+		modelController.Yaw += deltaYaw * deltaTime * 10.0f;
+		modelController.updateVectors();
+	}
+	else {
+		btVector3 cur = body->getLinearVelocity();
+		body->setLinearVelocity(btVector3(0.0f, cur.getY(), 0.0f));
 	}
 }
 
@@ -542,11 +880,16 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 }
 Animation* currentCatAnimation = nullptr;
 
-void SetCatAnimation(Animation* newAnim)
+void SetCatAnimation(Animation* newClip, AnimState newState)
 {
-	if (newAnim && newAnim->HasAnimation() && newAnim != currentCatAnimation)
+	// si viene nullptr no hacemos nada
+	if (!newClip) return;
+
+	// Cambiar sólo si es un estado/clip distinto para NO reiniciar el timing
+	if (newClip != gCurrentClip || newState != gCurrentState)
 	{
-		catAnimator1.PlayAnimation(newAnim);
-		currentCatAnimation = newAnim;
+		catAnimator1.PlayAnimation(newClip, /*resetIfNew=*/false); // <- reanuda
+		gCurrentClip = newClip;
+		gCurrentState = newState;
 	}
 }

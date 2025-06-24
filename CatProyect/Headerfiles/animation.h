@@ -48,9 +48,9 @@ public:
 		m_HasAnimation = true;
 	}
 
-	bool HasAnimationModel() const 
+	bool HasAnimationModel() const
 	{
-		return m_HasAnimation; 
+		return m_HasAnimation;
 	}
 
 	~Animation() {}

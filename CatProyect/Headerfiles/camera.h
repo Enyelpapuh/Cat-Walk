@@ -29,7 +29,7 @@ public:
     glm::vec3 Right;
     glm::vec3 WorldUp;
 
-    float Yaw;
+    float Yaw = 0.0f;
     float Pitch;
     float MovementSpeed;
     float MouseSensitivity;
@@ -121,7 +121,7 @@ private:
 // --------------------------------------------------
 // ModelController Class
 // --------------------------------------------------
-const float MODEL_SPEED = 7.0f;
+const float MODEL_SPEED = 5.0f;
 
 class ModelController {
 public:
@@ -135,7 +135,7 @@ public:
     float MovementSpeed;
 
     ModelController(glm::vec3 position = glm::vec3(0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
-        float yaw = -90.0f)
+        float yaw = 0.0f)
         : Front(glm::vec3(0.0f, 0.0f, -1.0f)),
         MovementSpeed(MODEL_SPEED),
         Yaw(yaw),
@@ -168,13 +168,14 @@ public:
 
     void updateVectors() {
         glm::vec3 front;
-        front.x = cos(glm::radians(Yaw));
+        front.x = cos(glm::radians(Yaw)); // Ajusta el signo si es necesario
         front.y = 0.0f;
-        front.z = sin(glm::radians(Yaw));
+        front.z = sin(glm::radians(Yaw)); // Ajusta el signo si es necesario
         Front = glm::normalize(front);
         Right = glm::normalize(glm::cross(Front, WorldUp));
         Up = glm::normalize(glm::cross(Right, Front));
     }
+
     void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainYaw = false)
     {
         float sensitivity = 0.1f;
@@ -206,6 +207,31 @@ public:
     glm::mat4 GetViewMatrix() const {
         return glm::lookAt(Position, Position + Front, Up);
     }
+    void SmoothYawTo(const float targetYaw, float deltaTime)
+    {
+        static float yawNow = 0.0f;
+
+        auto Wrap = [](float a) {
+            while (a > 180.f) a -= 360.f;
+            while (a < -180.f) a += 360.f;
+            return a;
+            };
+
+        float yawTarget = Wrap(targetYaw);
+        yawNow = Wrap(yawNow);
+        float delta = Wrap(yawTarget - yawNow);
+
+        float speed = 180.0f * deltaTime;
+
+        if (std::abs(delta) < speed)
+            yawNow = yawTarget;
+        else
+            yawNow += (delta > 0 ? +1 : -1) * speed;
+
+        Yaw = yawNow;
+        updateVectors();
+    }
+
 
 };
 

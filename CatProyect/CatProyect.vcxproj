@@ -71,8 +71,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)\..\CatProyect\Libreries\Include;$(SolutionDir)\..\CatProyect\Headerfiles;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;C:\Users\Rebec\Downloads\catwalko\wiskas2.0\CatProyect\Libreries\Include\SFML;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SolutionDir)\..\CatProyect\Libreries\lib;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\..\CatProyect\Libreries\Include;$(SolutionDir)\..\CatProyect\Headerfiles;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;C:\Users\user\Desktop\TrabajoFinal\Enyel\CatProyect\CatProyect\Libreries\Include\SFML;C:\Users\user\Desktop\TrabajoFinal\Cat-Walk\CatProyect\Libreries\bullet64\include\bullet;C:\Users\user\Desktop\TrabajoFinal\Cat-Walk\CatProyect\Headerfiles;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\..\CatProyect\Libreries\lib;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;C:\Users\user\Desktop\TrabajoFinal\Cat-Walk\CatProyect\Libreries\bullet64\debug\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -113,7 +113,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>sfml-graphics-d.lib;sfml-window-d.lib;sfml-audio-d.lib;sfml-network-d.lib;sfml-system-d.lib;fmod_vc.lib;fmodstudioL_vc.lib;fmodstudio_vc.lib;fmodL_vc.lib;FreeImage.lib;glfw3.lib;glew32.lib;opengl32.lib;user32.lib;gdi32.lib;shell32.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>sfml-graphics-d.lib;sfml-window-d.lib;sfml-audio-d.lib;sfml-network-d.lib;sfml-system-d.lib;fmod_vc.lib;fmodstudioL_vc.lib;fmodstudio_vc.lib;fmodL_vc.lib;FreeImage.lib;glfw3.lib;glew32.lib;opengl32.lib;user32.lib;gdi32.lib;shell32.lib;assimp-vc143-mt.lib;BulletCollision_Debug.lib;BulletDynamics_Debug.lib;LinearMath_Debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -141,6 +141,7 @@
     <ClInclude Include="Headerfiles\assimp_glm_helpers.h" />
     <ClInclude Include="Headerfiles\bone.h" />
     <ClInclude Include="Headerfiles\camera.h" />
+    <ClInclude Include="Headerfiles\DebugDrawer.h" />
     <ClInclude Include="Headerfiles\filesystem.h" />
     <ClInclude Include="Headerfiles\imconfig.h" />
     <ClInclude Include="Headerfiles\imgui.h" />
@@ -153,8 +154,8 @@
     <ClInclude Include="Headerfiles\imstb_truetype.h" />
     <ClInclude Include="Headerfiles\InitGL.h" />
     <ClInclude Include="Headerfiles\material.h" />
-    <ClInclude Include="Headerfiles\mesh.h" />
     <ClInclude Include="Headerfiles\model_animation.h" />
+    <ClInclude Include="Headerfiles\PhysicsManager.h" />
     <ClInclude Include="Headerfiles\shader.h" />
     <ClInclude Include="Headerfiles\shaderProgram.h" />
     <ClInclude Include="Headerfiles\shader_m.h" />
@@ -718,6 +719,7 @@
   <ItemGroup>
     <ClCompile Include="Cfiles\InitGL.cpp" />
     <ClCompile Include="Cfiles\Main.cpp" />
+    <ClCompile Include="Cfiles\PhysicsManager.cpp" />
     <ClCompile Include="Cfiles\UI.cpp" />
     <ClCompile Include="glad.c" />
     <ClCompile Include="Libreries\Include\glm\detail\glm.cpp" />

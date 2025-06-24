@@ -51,7 +51,10 @@ public:
 
 	auto& GetBoneInfoMap() { return m_BoneInfoMap; }
 	int& GetBoneCount() { return m_BoneCounter; }
-
+	/* ---------- NUEVO ---------- */
+	// Devuelve el extremo mínimo y máximo de la AABB (en unidades del modelo)
+	glm::vec3 GetAABBMin() const { return aabbMin; }
+	glm::vec3 GetAABBMax() const { return aabbMax; }
 
 private:
 
@@ -126,6 +129,11 @@ private:
 		vector<unsigned int> indices;
 		vector<Texture> textures;
 
+		unsigned int uvChannel = 0;
+		if (!textures_loaded.empty()) {
+			uvChannel = textures_loaded[0].uvIndex; // Usa el canal de UV de la textura principal
+		}
+
 		for (unsigned int i = 0; i < mesh->mNumVertices; i++)
 		{
 			Vertex vertex;
@@ -133,12 +141,18 @@ private:
 			vertex.Position = AssimpGLMHelpers::GetGLMVec(mesh->mVertices[i]);
 			vertex.Normal = AssimpGLMHelpers::GetGLMVec(mesh->mNormals[i]);
 
-			vertex.TexCoords = mesh->mTextureCoords[0] ?
-				glm::vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y) :
-				glm::vec2(0.0f, 0.0f);
+			if (mesh->HasTextureCoords(uvChannel) && mesh->mTextureCoords[uvChannel]) {
+				vertex.TexCoords = glm::vec2(mesh->mTextureCoords[uvChannel][i].x, mesh->mTextureCoords[uvChannel][i].y);
+			}
+			else {
+				vertex.TexCoords = glm::vec2(0.0f, 0.0f);
+			}
 
+			aabbMin = glm::min(aabbMin, vertex.Position);
+			aabbMax = glm::max(aabbMax, vertex.Position);
 			vertices.push_back(vertex);
 		}
+
 
 		for (unsigned int i = 0; i < mesh->mNumFaces; i++)
 		{
@@ -218,6 +232,16 @@ private:
 		}
 	}
 
+	/* ---------- NUEVO ---------- */
+	glm::vec3 aabbMin{ FLT_MAX,  FLT_MAX,  FLT_MAX };
+	glm::vec3 aabbMax{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+
+	/* ---------- Métodos auxiliares ---------- */
+	void updateAABB(const glm::vec3& v) {
+		aabbMin = glm::min(aabbMin, v);
+		aabbMax = glm::max(aabbMax, v);
+	}
+
 
 	unsigned int TextureFromFile(const char* path, const string&, bool gamma = false)
 	{
@@ -266,31 +290,34 @@ private:
 		for (unsigned int i = 0; i < mat->GetTextureCount(type); i++)
 		{
 			aiString str;
-			mat->GetTexture(type, i, &str);
-			// check if texture was loaded before and if so, continue to next iteration: skip loading a new texture
+			unsigned int uvIndex = 0;
+			mat->GetTexture(type, i, &str, nullptr, &uvIndex); // Obtener el índice de UV
+
 			bool skip = false;
 			for (unsigned int j = 0; j < textures_loaded.size(); j++)
 			{
 				if (std::strcmp(textures_loaded[j].path.data(), str.C_Str()) == 0)
 				{
 					textures.push_back(textures_loaded[j]);
-					skip = true; // a texture with the same filepath has already been loaded, continue to next one. (optimization)
+					skip = true;
 					break;
 				}
 			}
 			if (!skip)
-			{   // if texture hasn't been loaded already, load it
+			{
 				Texture texture;
 				texture.id = TextureFromFile(str.C_Str(), this->directory);
 				texture.type = typeName;
 				texture.path = str.C_Str();
+				texture.uvIndex = uvIndex; // <-- Añade este campo a tu struct Texture
 				textures.push_back(texture);
-				textures_loaded.push_back(texture);  // store it as texture loaded for entire model, to ensure we won't unnecessary load duplicate textures.
+				textures_loaded.push_back(texture);
 			}
 		}
-
 		return textures;
 	}
+
+
 };
 
 

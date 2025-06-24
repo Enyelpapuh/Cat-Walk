@@ -32,11 +32,29 @@ public:
 		}
 	}
 
-	void PlayAnimation(Animation* pAnimation)
+	void PlayAnimation(Animation* pAnimation, bool resetIfNew = true)
 	{
-		m_CurrentAnimation = pAnimation;
-		m_CurrentTime = 0.0f;
+		if (!pAnimation) return;
+
+		// Si era un clip diferente…
+		if (pAnimation != m_CurrentAnimation)
+		{
+			// …guardamos el momento en que quedó el anterior:
+			if (m_CurrentAnimation)
+				m_TimeCache[m_CurrentAnimation] = m_CurrentTime;
+
+			m_CurrentAnimation = pAnimation;
+
+			// Recuperamos el instante donde lo dejamos (o 0 si nunca se reprodujo)
+			auto found = m_TimeCache.find(pAnimation);
+			if (found != m_TimeCache.end() && !resetIfNew)
+				m_CurrentTime = found->second;
+			else
+				m_CurrentTime = 0.0f;               // primer run o queremos reiniciar
+		}
+		// Si es el mismo clip, no tocar m_CurrentTime (evita ‘rewind’)
 	}
+
 
 	void PlayAnimationByName(const std::string& name)
 	{
@@ -83,12 +101,13 @@ public:
 	{
 		return m_FinalBoneMatrices;
 	}
-	 bool HasAnimation() const
-    {
-        return m_CurrentAnimation && m_CurrentAnimation->HasAnimation();
-    }
+	bool HasAnimation() const
+	{
+		return m_CurrentAnimation && m_CurrentAnimation->HasAnimation();
+	}
 
 private:
+	std::unordered_map<const Animation*, float> m_TimeCache;
 	std::vector<glm::mat4> m_FinalBoneMatrices;
 	Animation* m_CurrentAnimation;
 	std::map<std::string, Animation*> m_Animations;
