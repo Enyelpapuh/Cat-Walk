@@ -35,18 +35,13 @@ extern unsigned int SCR_HEIGHT = 1080;
 extern float lastX = SCR_WIDTH / 2.0f;
 extern float lastY = SCR_HEIGHT / 2.0f;
 
-//void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-//void mouse_callback(GLFWwindow* window, double xpos, double ypos);
-//void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-//void processInput(GLFWwindow* window);
-
 // Esta función lanza el menú de pausa en un hilo aparte
 
 std::atomic<bool> pausaActiva(false);
 std::atomic<bool> juegoPausado(false);
 
-Camera camera(glm::vec3(0.0f, 0.0f, .0f));
-ModelController modelController(glm::vec3(-1.0f, -1.0f, 0.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 2.0f));
+ModelController modelController(glm::vec3(0.0f, 1.0f, 0.0f));
 
 bool firstMouse = true;
 bool isMovingForward = false;
@@ -72,7 +67,7 @@ Animation* gCurrentClip = nullptr;
 Animator catAnimator1(nullptr);
 //Physics init
 PhysicsManager physics;
-btRigidBody* catRigidBody = physics.CreateDynamicBox(glm::vec3(0, 5.0, 0), glm::vec3(0.5f, 1.0f, 0.5f), 1.0f);
+btRigidBody* catRigidBody = physics.CreateDynamicBox(glm::vec3(0, 1.0, 0), glm::vec3(0.4f, 0.6f, 0.4f), 1.0f);
 
 //FMOD
 //FMOD_RESULT result;
@@ -110,13 +105,13 @@ void lanzarMenuPausa(Menu* menu) {
 float skyboxVertices[] =
 {
 	//   Coordinates
-	-1.0f, -1.0f,  1.0f,//        7--------6
-	 1.0f, -1.0f,  1.0f,//       /|       /|
-	 1.0f, -1.0f, -1.0f,//      4--------5 |
-	-1.0f, -1.0f, -1.0f,//      | |      | |
-	-1.0f,  1.0f,  1.0f,//      | 3------|-2
-	 1.0f,  1.0f,  1.0f,//      |/       |/
-	 1.0f,  1.0f, -1.0f,//      0--------1
+	-1.0f, -1.0f,  1.0f,
+	 1.0f, -1.0f,  1.0f,
+	 1.0f, -1.0f, -1.0f,
+	-1.0f, -1.0f, -1.0f,
+	-1.0f,  1.0f,  1.0f,
+	 1.0f,  1.0f,  1.0f,
+	 1.0f,  1.0f, -1.0f,
 	-1.0f,  1.0f, -1.0f
 };
 
@@ -246,16 +241,13 @@ int main()
 	Model faroModel("Assets/Models/Faro/Faro.fbx", "Assets/Models/Faro/textures/FaroColor.png");
 	glm::vec3 faroPosition = glm::vec3(10.0f, 0.0f, 5.0f); // Cambia la posición según lo necesites
 
-
-
-
 	Model Mapa("Assets/Models/cueva/city2.fbx", "Assets/Models/cueva/textures/ParkColor1.png");//modelo
 	// Sincronizar la dirección inicial del modelo con la cámara
 	modelController.Yaw = camera.Yaw;
 	modelController.updateVectors();
 	// Crear colisionador dinámico para el gato
 	btRigidBody* catRigidBody = physics.CreateDynamicBox(
-		glm::vec3(0, 5.0f, 0),      // posición inicial
+		glm::vec3(0, 1.0f, 0),      // posición inicial
 		glm::vec3(0.5f, 0.5f, 1.0f), // tamaño caja (ancho, alto, profundidad)
 		1.0f                      // masa
 	);
@@ -271,14 +263,30 @@ int main()
 	lineShader.setMat4("view", view);
 	// Crear colisionador estático del mapa
 // Escala NO uniforme (correcto si quieres 20x4x20)
-	btRigidBody* mapRigidBody = physics.CreateStaticMeshFromModel(
-		Mapa,
-		glm::vec3(4.0f, 4.0f, 4.0f), // Escala X, Y, Z
-		glm::vec3(-90.0f, 0.0f, 0.0f)  // Rotación en grados
-	);
+// Obtener la AABB del modelo
+	glm::vec3 min = Mapa.GetAABBMin();
+	glm::vec3 max = Mapa.GetAABBMax();
+
+	// Validar la AABB antes de crear el colisionador
+	if (min.x == FLT_MAX || min.y == FLT_MAX || min.z == FLT_MAX ||
+		max.x == -FLT_MAX || max.y == -FLT_MAX || max.z == -FLT_MAX) {
+		std::cerr << "Error: La AABB del modelo de mapa no es válida. No se creará el colisionador." << std::endl;
+	}
+	else {
+		btVector3 btMin = glmToBt(min);
+		btVector3 btMax = glmToBt(max);
+
+		// Ahora puedes crear el colisionador usando btMin y btMax, o pasar el modelo a tu PhysicsManager
+		btRigidBody* mapRigidBody = physics.CreateStaticMeshFromModel(
+			Mapa,
+			glm::vec3(4.0f, 4.0f, 4.0f), // Escala
+			glm::vec3(-90.0f, 0.0f, 0.0f) // Rotación
+		);
+	}
 
 
-	Shader ourShader2("skybox.vert", "skybox.frag");
+
+	Shader ourShader2("Assets/Shaders/skybox.vert", "Assets/Shaders/skybox.frag");
 
 	ourShader.use();
 	ourShader.setVec3("ambientLightColor", glm::vec3(0.2f, 0.2f, 0.3f)); // Azul tenue
@@ -527,17 +535,17 @@ int main()
 		//--------------------- direccion modelo --------------------
 	
 		// Calcula la rotación deseada: la dirección contraria a la cámara
-		float desiredYaw = camera.Yaw + 180.0f;
+		//float desiredYaw = camera.Yaw + 180.0f;
 
-		// Normaliza ángulo
-		if (desiredYaw > 180.0f)
-			desiredYaw -= 360.0f;
-		else if (desiredYaw < -180.0f)
-			desiredYaw += 360.0f;
+		//// Normaliza ángulo
+		//if (desiredYaw > 180.0f)
+		//	desiredYaw -= 360.0f;
+		//else if (desiredYaw < -180.0f)
+		//	desiredYaw += 360.0f;
 
-		// Suaviza la rotación (evita giros bruscos)
-		float rotationSpeed = 5.0f; // Puedes ajustar la velocidad de rotación
-		modelController.Yaw = glm::mix(modelController.Yaw, desiredYaw, deltaTime * rotationSpeed);
+		//// Suaviza la rotación (evita giros bruscos)
+		//float rotationSpeed = 5.0f; // Puedes ajustar la velocidad de rotación
+		//modelController.Yaw = glm::mix(modelController.Yaw, desiredYaw, deltaTime * rotationSpeed);
 
 
 		// -------------------- ACTUALIZAR ANIMACIONES --------------------
@@ -689,10 +697,21 @@ int main()
 		// -------------------- FARO --------------------
 
 		std::vector<glm::vec3> posicionesFaros = {
-			glm::vec3(-8.0f, -6.0f, -48.0f),
-			glm::vec3(7.0f, -6.0f, -48.0f),
-			glm::vec3(46.0f, -6.0f, -7.0f),
-			glm::vec3(46.0f, -5.0f, 8.0f)
+			// Parte trasera (z negativo)
+			glm::vec3(-8.0f, -6.0f, -48.0f), // izquierda abajo
+			glm::vec3(7.0f, -6.0f, -48.0f),  // derecha abajo
+
+			// Parte derecha (x positivo)
+			glm::vec3(46.0f, -6.0f, -7.0f),  // derecha abajo
+			glm::vec3(46.0f, -5.0f, 8.0f),   // derecha arriba
+
+			// Parte frontal (z positivo)
+			glm::vec3(-8.0f, -6.0f, 48.0f),  // izquierda abajo
+			glm::vec3(7.0f, -6.0f, 48.0f),   // derecha abajo
+
+			// Parte izquierda (x negativo)
+			glm::vec3(-48.0f, -6.0f, -7.0f), // izquierda abajo
+			glm::vec3(-48.0f, -5.0f, 8.0f)   // izquierda arriba
 		};
 
 		ourShader.use();
@@ -700,8 +719,8 @@ int main()
 		for (size_t i = 0; i < posicionesFaros.size(); ++i) {
 			ourShader.setVec3("pointLights[" + std::to_string(i) + "].position", posicionesFaros[i]);
 			ourShader.setVec3("pointLights[" + std::to_string(i) + "].color", glm::vec3(1.0f, 0.95f, 0.8f)); // o azul si quieres
-			ourShader.setFloat("pointLights[" + std::to_string(i) + "].intensity", 4.0f);
-			ourShader.setFloat("pointLights[" + std::to_string(i) + "].radius", 30.0f);
+			ourShader.setFloat("pointLights[" + std::to_string(i) + "].intensity", 3.5f);
+			ourShader.setFloat("pointLights[" + std::to_string(i) + "].radius", 25.0f);
 		}
 		ourShader.setVec3("viewPos", camera.Position);
 		for (const auto& pos : posicionesFaros) {

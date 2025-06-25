@@ -71,8 +71,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)\..\CatProyect\Libreries\Include;$(SolutionDir)\..\CatProyect\Headerfiles;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;C:\Users\user\Desktop\TrabajoFinal\Enyel\CatProyect\CatProyect\Libreries\Include\SFML;C:\Users\user\Desktop\TrabajoFinal\Cat-Walk\CatProyect\Libreries\bullet64\include\bullet;C:\Users\user\Desktop\TrabajoFinal\Cat-Walk\CatProyect\Headerfiles;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SolutionDir)\..\CatProyect\Libreries\lib;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;C:\Users\user\Desktop\TrabajoFinal\Cat-Walk\CatProyect\Libreries\bullet64\debug\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\..\CatProyect\Libreries\Include;$(SolutionDir)\..\CatProyect\Headerfiles;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;$(SolutionDir)\..\CatProyect\Libreries\Include\SFML;$(SolutionDir)\..\CatProyect\Libreries\bullet64\include\bullet;$(SolutionDir)\..\Cat-Walk\CatProyect\Headerfiles;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\..\CatProyect\Libreries\lib;$(SolutionDir)\..\CatProyect\Libreries\Include\FreeImage\Dist\x64;$(SolutionDir)\..\CatProyect\Libreries\bullet64\debug\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
